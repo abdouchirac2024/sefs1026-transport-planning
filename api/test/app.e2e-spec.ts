@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
 import { AppModule } from './../src/app.module';
+import { configureApp } from './../src/configure-app';
 
 /**
  * Test e2e nécessitant SQL Server démarré (docker compose up -d, init.sql exécuté).
@@ -19,6 +20,7 @@ describeWithDb('GET /vehicles (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    configureApp(app);
     await app.init();
   });
 

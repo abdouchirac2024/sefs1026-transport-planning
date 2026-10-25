@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/configure-app';
 import { DatabaseService, sql } from '../src/database/database.service';
 import { resetDatabase } from './helpers/reset-database';
 
@@ -45,6 +46,7 @@ describeWithDb('Scénarios section 8 (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    configureApp(app);
     await app.init();
     db = moduleFixture.get(DatabaseService);
   });
