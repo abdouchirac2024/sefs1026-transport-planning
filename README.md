@@ -38,7 +38,11 @@ npm run start:dev
 ```
 
 - API : `http://localhost:3000`
-- Swagger : non implémenté (bonus non traité, voir "Ce qui manque")
+- Swagger : `http://localhost:3000/api/docs` (en-tête `X-User-Id` documenté sur chaque route,
+  avec un exemple de réponse pour chaque code d'erreur possible). Non encore vérifié en
+  conditions réelles : l'application doit se connecter à SQL Server au démarrage
+  (`DatabaseService.onModuleInit`), donc impossible de confirmer que `/api/docs` se charge
+  correctement tant que la base n'est pas disponible (voir "Ce qui manque").
 
 ### 3. Front (Vue 3)
 
@@ -187,7 +191,9 @@ Hors de cette vérification en attente, ce que je ferais avec plus de temps :
 - Tests e2e en CI avec conteneur SQL Server éphémère (le test e2e existe déjà, gaté par
   `E2E_DB=true`, mais n'est pas branché dans une pipeline).
 - Tests de composants Vue (Vitest + @vue/test-utils) au-delà de `domain/permissions.ts`.
-- Bonus non traités : Swagger, i18n FR/EN.
+- Bonus non traités : i18n FR/EN. Swagger est fait (`@nestjs/swagger`, `/api/docs`,
+  `@ApiHeader` pour `X-User-Id`, exemples de réponses d'erreur par route) mais pas encore
+  vérifié en conditions réelles, pour la même raison que le reste.
 
 ## Temps réellement passé
 

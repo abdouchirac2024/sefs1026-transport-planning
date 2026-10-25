@@ -60,6 +60,13 @@ Ces deux cas sont des problèmes de forme de la requête (détectables sans aucu
 base), donc `400`, à la différence des commandes introuvables (`404`) ou non planifiables
 (`409`) qui dépendent de l'état réel en base.
 
+## Version de @nestjs/swagger
+
+**Décision** : `@nestjs/swagger@7.4.2` plutôt que la dernière version (12.x). La version 12
+exige `@nestjs/common@^12.0.0`, incompatible avec le NestJS 10 utilisé dans ce projet. 7.4.2
+est la dernière version de la branche 7.x compatible avec Nest 10, sans forcer une montée de
+version de tout le framework pour un bonus.
+
 ## Client HTTP front
 
 **Décision** : `fetch` natif avec un petit wrapper, plutôt qu'axios. Le périmètre de l'API est
