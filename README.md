@@ -63,7 +63,8 @@ cd api
 npm run lint
 npm test                      # tests unitaires (Jest) : règles métier, DTO, service. Aucune dépendance externe.
 npm run test:cov              # couverture (100% sur domain/transport-order.rules.ts)
-E2E_DB=true npm run test:e2e  # tests e2e : nécessite SQL Server démarré + init.sql exécuté (section 1)
+npm run db:reset              # relance init.sql via docker compose exec + sqlcmd (repart de zéro)
+npm run test:e2e:live         # db:reset puis E2E_DB=true npm run test:e2e -- tous les scénarios de la section 8
 
 # Front
 cd web
@@ -73,7 +74,14 @@ npm run build                 # vérifie aussi le typage (vue-tsc)
 ```
 
 Sans `E2E_DB=true`, les tests e2e API sont ignorés (`describe.skip`) pour que
-`npm run test:e2e` reste vert même sans base disponible.
+`npm run test:e2e` reste vert même sans base disponible (confirmé : 24 tests skip, exit
+code 0). `test/section8-scenarios.e2e-spec.ts` rejoue dans l'ordre tous les scénarios de la
+section 8 du skill (lectures, création, capacité, tout-ou-rien, rôles, transitions de
+statut, et le cas de concurrence — deux ajouts simultanés de la même commande dans deux
+ordres). Ces tests sont volontairement **dépendants les uns des autres** (comme le tableau
+de la section 8 lui-même) : toujours les relancer avec `npm run test:e2e:live`, jamais en
+isolation ni dans le désordre. **Non encore exécutés contre une vraie base** au moment de la
+rédaction (voir "Ce qui manque").
 
 ### Utilisateurs de test
 
@@ -168,7 +176,8 @@ sujet n'ont pas encore pu être exécutés contre une vraie instance SQL Server*
 rédaction de ce README. Tout le code (API et front) a été écrit en suivant scrupuleusement la
 syntaxe T-SQL attendue (noms de colonnes entre crochets, `OPENJSON`, `OFFSET/FETCH`,
 `sp_getapplock`, etc.), et est couvert par 79 tests API + 11 tests front qui ne nécessitent pas
-de base — mais rien ne remplace une exécution réelle. **Cette section sera mise à jour dès que
+de base, ainsi que 21 tests e2e (`npm run test:e2e:live`) qui rejouent tous les scénarios de la
+section 8 — mais rien ne remplace une exécution réelle. **Cette section sera mise à jour dès que
 la vérification contre la vraie base aura été faite**, avec la liste des éventuels correctifs.
 
 Risques les plus probables identifiés à l'avance (à vérifier en priorité) :
