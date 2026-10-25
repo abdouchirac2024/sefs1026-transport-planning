@@ -111,6 +111,7 @@ export class TransportOrdersController {
 
   @Post(':no/lines')
   @Roles(Role.DISPATCHER, Role.LOGISTICS_MANAGER)
+  @HttpCode(HttpStatus.OK)
   @IF_MATCH_HEADER
   @ApiOperation({
     summary: "Ajoute une ou plusieurs commandes à l'ordre (tout ou rien).",
@@ -195,6 +196,7 @@ export class TransportOrdersController {
 
   @Post(':no/validate')
   @Roles(Role.LOGISTICS_MANAGER)
+  @HttpCode(HttpStatus.OK)
   @IF_MATCH_HEADER
   @ApiOperation({
     summary:
@@ -236,6 +238,7 @@ export class TransportOrdersController {
 
   @Post(':no/depart')
   @Roles(Role.DISPATCHER, Role.LOGISTICS_MANAGER)
+  @HttpCode(HttpStatus.OK)
   @IF_MATCH_HEADER
   @ApiOperation({
     summary:
