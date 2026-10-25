@@ -4,7 +4,11 @@ import Select from 'primevue/select';
 import { useUserStore } from '../stores/user';
 
 const userStore = useUserStore();
-const { currentUserId, knownUsers } = storeToRefs(userStore);
+const { currentUserId } = storeToRefs(userStore);
+// Liste statique (jamais modifiée à l'exécution) : storeToRefs() ne garde que les propriétés
+// réactives (ref/computed), une constante brute comme knownUsers en serait silencieusement
+// exclue (undefined après déstructuration). Accès direct, pas besoin de réactivité ici.
+const knownUsers = userStore.knownUsers;
 
 function onChange(value: unknown): void {
   if (typeof value === 'string') {
