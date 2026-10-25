@@ -1,0 +1,42 @@
+import { INestApplication } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import * as request from 'supertest';
+import { AppModule } from './../src/app.module';
+
+/**
+ * Test e2e nécessitant SQL Server démarré (docker compose up -d) avec init.sql exécuté.
+ */
+describe('GET /vehicles (e2e)', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('renvoie uniquement les véhicules actifs, en camelCase', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/vehicles')
+      .expect(200);
+
+    expect(Array.isArray(response.body)).toBe(true);
+    expect(response.body.length).toBe(9);
+    expect(
+      response.body.some((v: { code: string }) => v.code === 'VH-07'),
+    ).toBe(false);
+
+    const first = response.body[0];
+    expect(first).toHaveProperty('code');
+    expect(first).toHaveProperty('plateNo');
+    expect(first).toHaveProperty('capacityKg');
+    expect(first).toHaveProperty('active', true);
+  });
+});
