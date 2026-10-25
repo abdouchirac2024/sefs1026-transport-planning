@@ -44,6 +44,22 @@ Parti, jamais de retour arrière. Mentionné comme amélioration possible dans l
 `DataTable` avec pagination côté serveur et sélection multiple intégrées (utile pour l'écran
 "Commandes à planifier"), ainsi que `Dialog`, `ProgressBar`, `Toast`, `Tag`.
 
+## Doublons et liste vide dans l'ajout de commandes
+
+**Ambiguïté** : le guide de réalisation mentionne, pour `POST /transport-orders/:no/lines`,
+"dédoublonner" (suggérant une suppression silencieuse des doublons), mais liste par ailleurs
+"doublons dans la requête" et "liste vide" comme des scénarios de test qui doivent produire
+"des erreurs avec le bon code", et la signature documentée de `assertPlannable` indique
+explicitement `// existence + statut 0 + doublons` (donc une vérification qui peut échouer).
+
+**Décision** : `assertPlannable` rejette (plutôt que de silencieusement dédupliquer) :
+- une liste vide → `400 VALIDATION_ERROR` ;
+- des numéros de commande en double dans la requête → `400 VALIDATION_ERROR`.
+
+Ces deux cas sont des problèmes de forme de la requête (détectables sans aucun accès à la
+base), donc `400`, à la différence des commandes introuvables (`404`) ou non planifiables
+(`409`) qui dépendent de l'état réel en base.
+
 ## Client HTTP front
 
 **Décision** : `fetch` natif avec un petit wrapper, plutôt qu'axios. Le périmètre de l'API est

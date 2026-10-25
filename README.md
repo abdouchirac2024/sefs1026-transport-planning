@@ -48,10 +48,13 @@ Front disponible sur `http://localhost:5173`.
 ### Tests
 
 ```bash
-cd api && npm test          # tests unitaires (Jest)
-cd api && npm run test:e2e  # tests e2e (nécessite SQL Server démarré, cf. section 1)
+cd api && npm test                     # tests unitaires (Jest), aucune dépendance externe
+cd api && E2E_DB=true npm run test:e2e # tests e2e, nécessite SQL Server démarré + init.sql exécuté (cf. section 1)
 cd web && npm run lint
 ```
+
+Sans la variable `E2E_DB=true`, les tests e2e sont ignorés (`describe.skip`) pour que
+`npm run test:e2e` reste vert même sans base disponible.
 
 ## Choix techniques
 
