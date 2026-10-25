@@ -22,9 +22,25 @@ describe('GET /vehicles (e2e)', () => {
     await app.close();
   });
 
+  it('refuse sans X-User-Id (401 UNAUTHENTICATED)', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/vehicles')
+      .expect(401);
+    expect(response.body.code).toBe('UNAUTHENTICATED');
+  });
+
+  it('refuse un X-User-Id inconnu (401 UNAUTHENTICATED)', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/vehicles')
+      .set('X-User-Id', 'bob')
+      .expect(401);
+    expect(response.body.code).toBe('UNAUTHENTICATED');
+  });
+
   it('renvoie uniquement les véhicules actifs, en camelCase', async () => {
     const response = await request(app.getHttpServer())
       .get('/vehicles')
+      .set('X-User-Id', 'diane')
       .expect(200);
 
     expect(Array.isArray(response.body)).toBe(true);
