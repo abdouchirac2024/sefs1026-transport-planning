@@ -1,0 +1,46 @@
+# Base SQL Server du test technique SEFS1026 (Afrikedge)
+#
+# 1. Démarrer SQL Server :
+#      docker compose up -d
+#
+# 2. Attendre que le conteneur soit prêt (statut "healthy", environ 30 secondes) :
+#      docker compose ps
+#
+# 3. Créer la base et les données de test :
+#      docker compose exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Afk_Transport2026" -C -i /scripts/init.sql
+#
+#    Le script peut être relancé à tout moment : il supprime puis recrée la base.
+#
+# Connexion depuis l'API ou depuis un client SQL :
+#   Serveur       localhost, port 1433
+#   Utilisateur   sa
+#   Mot de passe  Afk_Transport2026
+#   Base          TransportPlanning
+#   Le serveur utilise un certificat auto-signé : activer trustServerCertificate côté client.
+#
+# Si le port 1433 est déjà utilisé sur votre poste, remplacer "1433:1433" par "1434:1433"
+# et vous connecter sur le port 1434.
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    container_name: sefs1026-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: "Afk_Transport2026"
+    ports:
+      - "1433:1433"
+    volumes:
+      - ./init.sql:/scripts/init.sql:ro
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"Afk_Transport2026\" -C -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  sqlserver-data:
