@@ -22,3 +22,8 @@ export interface Page<T> {
   page: number;
   pageSize: number;
 }
+
+/** Nombre de lignes à sauter pour OFFSET ... FETCH NEXT, à partir d'une page 1-indexée. */
+export function toOffset(page: number, pageSize: number): number {
+  return (page - 1) * pageSize;
+}
