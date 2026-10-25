@@ -1,9 +1,12 @@
 # Présentation (5 minutes)
 
-> Script de présentation prévu pour l'entretien. **Non encore rejoué en conditions réelles** :
-> la vérification contre la vraie base SQL Server est en attente (voir README, section
-> "Ce qui manque"). Les scénarios ci-dessous sont ceux de la section 8 du sujet, à exécuter
-> tels quels dès que la base est prête — ce document sera confirmé (ou corrigé) à ce moment-là.
+> Script de présentation pour l'entretien. Le déroulé ci-dessous correspond exactement aux
+> scénarios de la section 8 du sujet, **tous vérifiés contre une vraie instance SQL Server**
+> (21/21, voir README section "Vérification contre la vraie base") via les tests e2e. Le
+> parcours écran par écran (clics, dialogs, jauge, boutons) n'a en revanche été rejoué que par
+> l'API, pas encore cliqué manuellement de bout en bout dans le navigateur au moment de la
+> rédaction -- le comportement attendu est donc garanti côté données, la mécanique d'affichage
+> reste à confirmer visuellement.
 
 ## 1. Démo (2 min)
 
@@ -60,12 +63,15 @@ Scénario, dans l'ordre :
 
 ## 4. Limites et suite (1 min)
 
-- Vérification complète contre la vraie base : **en attente** au moment de la rédaction de ce
-  document (voir README). Priorité n°1 avant toute autre amélioration.
+- Vérification complète contre la vraie base : **faite**, 21/21 scénarios passent. Deux bugs
+  trouvés et corrigés (chacun avec son commit `fix(api):`) : les tests e2e ne reproduisaient
+  pas la configuration de `main.ts` (`ValidationPipe`/filtre d'erreur — n'affectait que
+  l'environnement de test), et trois routes (`addLines`, `validate`, `depart`) renvoyaient
+  `201` au lieu de `200` (celui-ci affectait bien le serveur réel). Détail dans le README.
 - Pas de vraie authentification (JWT), pas d'index uniques filtrés en base (contournés par les
   verrous), fenêtre d'une heure autour de minuit où "aujourd'hui" côté serveur SQL (UTC) peut
   différer d'"aujourd'hui" à Douala (UTC+1).
-- Bonus non traités faute de temps : Swagger, i18n FR/EN, tests e2e en CI.
+- Bonus non traités faute de temps : i18n FR/EN, tests e2e en CI. Swagger est fait et vérifié.
 
 ---
 
@@ -101,6 +107,17 @@ Remplacer `CurrentUserGuard` par une stratégie JWT (`@nestjs/passport` + `passp
 peuple `request.user` de la même forme (`{ id, role }`). `RolesGuard` et `@Roles(...)` restent
 inchangés : ils ne dépendent que de la forme de `request.user`, pas de la façon dont il a été
 authentifié.
+
+**Quels bugs avez-vous trouvés en testant contre la vraie base, et comment les avez-vous
+corrigés sans tricher ?**
+Deux. Le premier (20 tests e2e en échec, surtout des 500 au lieu du bon code) venait du fait
+que `Test.createTestingModule().createNestApplication()` dans les tests e2e ne rejouait pas le
+`bootstrap()` de `main.ts` : pas de `ValidationPipe`, pas de filtre d'erreur. Corrigé en
+extrayant cette config dans une fonction partagée (`configureApp()`) appelée des deux côtés —
+les tests vérifient maintenant exactement ce que le serveur réel fait. Le second, réel celui-là
+(pas un artefact de test) : trois routes de mutation renvoyaient `201` au lieu de `200` faute de
+`@HttpCode` explicite. Dans les deux cas, j'ai corrigé le code, jamais modifié un test pour le
+faire passer artificiellement.
 
 **Comment gérer un très grand volume de commandes ?**
 La pagination actuelle utilise `OFFSET/FETCH`, simple mais coûteuse sur de très grandes tables

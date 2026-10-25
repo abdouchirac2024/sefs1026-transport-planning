@@ -67,6 +67,30 @@ exige `@nestjs/common@^12.0.0`, incompatible avec le NestJS 10 utilisé dans ce 
 est la dernière version de la branche 7.x compatible avec Nest 10, sans forcer une montée de
 version de tout le framework pour un bonus.
 
+## Configuration partagée entre main.ts et les tests e2e (bug trouvé à la vérification)
+
+**Constat** : lors de la première exécution des tests e2e contre une vraie base, 20 des 24
+tests échouaient -- la plupart en `500 Internal Server Error` au lieu du code attendu (401,
+403, 404, 409, 422...). Cause : `Test.createTestingModule({ imports: [AppModule] })
+.createNestApplication()` crée une instance Nest à partir du seul `AppModule`, sans jamais
+exécuter la fonction `bootstrap()` de `main.ts` -- donc sans `ValidationPipe` (DTO jamais
+transformés : `page`/`pageSize` restaient des chaînes, cassant la pagination SQL) ni
+`DomainErrorFilter` (toute `DomainError` remontait comme une exception non gérée → 500).
+
+**Décision** : extraire cette configuration commune dans `src/configure-app.ts`
+(`configureApp(app)`), appelée à la fois par `main.ts` et par les deux fichiers e2e. Au-delà
+du correctif, ça garantit que les tests e2e vérifient exactement le même comportement que le
+serveur réellement déployé -- une divergence entre les deux aurait pu masquer de vrais bugs à
+l'avenir.
+
+**Point important** : ce bug n'affectait que l'environnement de test, pas le serveur réel
+(`npm run start:dev` applique correctement `main.ts`). Un second bug trouvé à la même
+vérification, lui, affectait bien le serveur réel : `addLines`, `validate` et `depart`
+renvoyaient `201 Created` au lieu de `200 OK` (NestJS applique 201 par défaut à toute route
+`@Post()` sans `@HttpCode` explicite) -- corrigé en ajoutant `@HttpCode(HttpStatus.OK)` sur
+les trois routes. Voir le README, section "Vérification contre la vraie base", pour le détail
+complet et les commits `fix(api):` correspondants.
+
 ## Client HTTP front
 
 **Décision** : `fetch` natif avec un petit wrapper, plutôt qu'axios. Le périmètre de l'API est

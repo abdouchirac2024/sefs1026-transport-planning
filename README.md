@@ -5,8 +5,9 @@ commandes de vente dans un ordre de transport, affecté à un véhicule pour une
 la capacité du véhicule. API NestJS + SQL Server (sans ORM, requêtes paramétrées avec `mssql`),
 front Vue 3 + Pinia + PrimeVue.
 
-*(Pas de capture d'écran pour l'instant : l'application n'a pas encore tourné de bout en bout
-contre une vraie base — voir "Ce qui manque" ci-dessous.)*
+*(Pas de capture d'écran pour l'instant. L'application a été vérifiée de bout en bout contre une
+vraie instance SQL Server — voir "Vérification contre la vraie base" ci-dessous — mais aucune
+capture n'a été prise pendant la session de vérification.)*
 
 ## Prérequis
 
@@ -21,7 +22,7 @@ contre une vraie base — voir "Ce qui manque" ci-dessous.)*
 # Depuis la racine du projet (là où se trouve docker-compose.yml)
 docker compose up -d
 
-# Attendre que le conteneur soit "healthy" (normalement ~30 s ; voir "Ce qui manque")
+# Attendre que le conteneur soit "healthy" (quelques secondes une fois l'image téléchargée)
 docker compose ps
 
 # Créer la base et les données de test (peut être relancé à tout moment : repart de zéro)
@@ -39,10 +40,10 @@ npm run start:dev
 
 - API : `http://localhost:3000`
 - Swagger : `http://localhost:3000/api/docs` (en-tête `X-User-Id` documenté sur chaque route,
-  avec un exemple de réponse pour chaque code d'erreur possible). Non encore vérifié en
-  conditions réelles : l'application doit se connecter à SQL Server au démarrage
-  (`DatabaseService.onModuleInit`), donc impossible de confirmer que `/api/docs` se charge
-  correctement tant que la base n'est pas disponible (voir "Ce qui manque").
+  avec un exemple de réponse pour chaque code d'erreur possible). **Vérifié** : se charge
+  correctement (`/api/docs` en HTML, `/api/docs-json` pour le document OpenAPI), 9 chemins /
+  10 opérations présents, en-têtes `X-User-Id` et `If-Match` documentés, exemples d'erreur
+  conformes sur chaque route testée.
 
 ### 3. Front (Vue 3)
 
@@ -75,13 +76,15 @@ npm run build                 # vérifie aussi le typage (vue-tsc)
 
 Sans `E2E_DB=true`, les tests e2e API sont ignorés (`describe.skip`) pour que
 `npm run test:e2e` reste vert même sans base disponible (confirmé : 24 tests skip, exit
-code 0). `test/section8-scenarios.e2e-spec.ts` rejoue dans l'ordre tous les scénarios de la
-section 8 du skill (lectures, création, capacité, tout-ou-rien, rôles, transitions de
-statut, et le cas de concurrence — deux ajouts simultanés de la même commande dans deux
-ordres). Ces tests sont volontairement **dépendants les uns des autres** (comme le tableau
-de la section 8 lui-même) : toujours les relancer avec `npm run test:e2e:live`, jamais en
-isolation ni dans le désordre. **Non encore exécutés contre une vraie base** au moment de la
-rédaction (voir "Ce qui manque").
+code 0). `test/section8-scenarios.e2e-spec.ts` couvre tous les scénarios de la section 8 du
+skill (lectures, création, capacité, tout-ou-rien, rôles, transitions de statut, et le cas de
+concurrence — deux ajouts simultanés de la même commande dans deux ordres), regroupés en 6
+`describe` thématiques **indépendants** : chaque groupe relance `db:reset` (`beforeAll` ou
+`beforeEach` selon que des tests du groupe mutent ou non les mêmes lignes partagées), et
+aucun test ne dépend de l'effet d'un autre — chacun peut être lancé seul.
+
+**Vérifié contre une vraie instance SQL Server** (voir "Vérification contre la vraie base") :
+24/24 tests e2e passent, 79/79 tests unitaires API, 11/11 tests unitaires front.
 
 ### Utilisateurs de test
 
@@ -91,6 +94,57 @@ En-tête `X-User-Id`, sélecteur dans l'en-tête de l'application :
 |---|---|---|
 | `diane` | `DISPATCHER` | Créer un ordre, ajouter/retirer des commandes, marquer parti |
 | `eric` | `LOGISTICS_MANAGER` | Tout ce que fait `diane`, et valider un ordre |
+
+## Vérification contre la vraie base
+
+L'application a été vérifiée de bout en bout contre une vraie instance SQL Server (image
+`mcr.microsoft.com/mssql/server:2022-latest`, le téléchargement initial ayant pris plusieurs
+heures à cause d'un débit réseau anormalement faible dans l'environnement de développement —
+voir l'historique Git pour le détail de cette période). Résultat : **21/21 scénarios de la
+section 8 passent**, Swagger se charge correctement, le front fonctionne.
+
+| # | Scénario | Attendu | Obtenu |
+|---|---|---|---|
+| 1 | `GET /vehicles` | 9 véhicules, VH-07 exclu | ✅ |
+| 2 | `GET /sales-orders/to-plan` | 33 commandes (SO-1008→SO-1040) | ✅ |
+| 3 | Sans `X-User-Id` | 401 | ✅ |
+| 4 | `X-User-Id: bob` | 401 | ✅ |
+| 5 | Créer VH-07 demain | 422 `VEHICLE_INACTIVE` | ✅ |
+| 6 | Créer VH-03 demain (déjà réservé) | 409 `VEHICLE_ALREADY_BOOKED` | ✅ |
+| 7 | Créer VH-05 hier | 422 `DELIVERY_DATE_IN_PAST` | ✅ |
+| 8 | Créer VH-05 aujourd'hui | 201, `TO-0005` | ✅ |
+| 9 | TO-0003 + SO-1013 (145,50 kg) | 422 `CAPACITY_EXCEEDED` | ✅ |
+| 10 | TO-0003 + [SO-1027,SO-1040] (145,25 kg) | 422, aucune ajoutée | ✅ |
+| 11 | TO-0003 + SO-1027 seule | 200, 1 420,25 kg, SO-1027→Planifiée | ✅ |
+| 12 | TO-0003 + SO-1003 (déjà dans TO-0002) | 409 `SALES_ORDER_NOT_PLANNABLE` | ✅ |
+| 13 | Ajout sur TO-0002 (Validé) | 409 `ORDER_NOT_EDITABLE` | ✅ |
+| 14 | Retirer SO-1006 de TO-0003 | 200, SO-1006→À planifier | ✅ |
+| 15 | Valider TO-0003 par diane | 403 `FORBIDDEN_ROLE` | ✅ |
+| 16 | Valider TO-0004 (vide) par eric | 422 `EMPTY_ORDER` | ✅ |
+| 17 | Valider TO-0003 par eric | 200, `validatedBy=eric` | ✅ |
+| 18 | Départ TO-0004 (Brouillon) | 409 `INVALID_STATUS_TRANSITION` | ✅ |
+| 19 | Départ TO-0002 par diane | 200, SO-1003/1004/1005→En livraison | ✅ |
+| 20 | Départ TO-0001 (déjà parti) | 409 `INVALID_STATUS_TRANSITION` | ✅ |
+| 21 | Deux ajouts concurrents de SO-1008 | un seul réussit (200/409) | ✅ |
+
+### Bugs trouvés et corrigés (2, chacun avec un commit `fix(api): ...` séparé)
+
+1. **Les tests e2e ne configuraient pas `ValidationPipe`/`DomainErrorFilter`** comme `main.ts`
+   le fait. `Test.createTestingModule().createNestApplication()` ne rejoue pas le `bootstrap()`
+   de `main.ts` : sans cette config, toute erreur métier remontait en `500` brut au lieu du bon
+   code HTTP, et les DTO de requête n'étaient jamais transformés (`string` au lieu de `number`),
+   ce qui cassait aussi la pagination SQL (`OFFSET` non entier). Corrigé en extrayant la config
+   commune dans `configure-app.ts`, appelée par `main.ts` et par les deux fichiers e2e.
+   *N'affectait pas le serveur réellement déployé — uniquement l'environnement de test.*
+2. **`addLines`, `validate`, `depart` renvoyaient `201` au lieu de `200`** (NestJS applique 201
+   par défaut à toute route `@Post()` sans `@HttpCode` explicite). Corrigé en ajoutant
+   `@HttpCode(HttpStatus.OK)` sur les trois routes. *Celui-ci affectait bien le serveur réel —
+   un vrai bug métier, pas un artefact de test.*
+
+Aucun des risques identifiés à l'avance (combinaison `GROUP BY` + `COUNT(*) OVER()` +
+`OFFSET/FETCH`, syntaxe `sp_getapplock`, `OPENJSON`, noms de colonnes entre crochets) ne s'est
+révélé être un problème : le SQL écrit en suivant la documentation était correct du premier
+coup.
 
 ## Choix techniques et pourquoi
 
@@ -168,26 +222,9 @@ Résumé :
 
 ## Ce qui manque / avec plus de temps
 
-**Important — honnêteté avant tout** : à cause d'un téléchargement Docker de l'image SQL Server
-anormalement lent et instable dans l'environnement de développement (débit très faible, coupures
-de connexion répétées après quelques Mo malgré plusieurs tentatives, y compris en limitant le
-nombre de téléchargements simultanés), **les requêtes SQL et les scénarios de la section 8 du
-sujet n'ont pas encore pu être exécutés contre une vraie instance SQL Server** au moment de la
-rédaction de ce README. Tout le code (API et front) a été écrit en suivant scrupuleusement la
-syntaxe T-SQL attendue (noms de colonnes entre crochets, `OPENJSON`, `OFFSET/FETCH`,
-`sp_getapplock`, etc.), et est couvert par 79 tests API + 11 tests front qui ne nécessitent pas
-de base, ainsi que 21 tests e2e (`npm run test:e2e:live`) qui rejouent tous les scénarios de la
-section 8 — mais rien ne remplace une exécution réelle. **Cette section sera mise à jour dès que
-la vérification contre la vraie base aura été faite**, avec la liste des éventuels correctifs.
-
-Risques les plus probables identifiés à l'avance (à vérifier en priorité) :
-- La combinaison `GROUP BY` + fenêtre `COUNT(*) OVER()` + `OFFSET/FETCH` dans la liste des
-  ordres de transport.
-- La syntaxe exacte de `EXEC sp_getapplock` avec un paramètre nommé plutôt qu'une valeur littérale.
-- Le comportement d'`OPENJSON` avec un tableau de chaînes JSON en paramètre `NVARCHAR(MAX)`.
-- Les noms de colonnes entre crochets contre le schéma réel créé par `init.sql`.
-
-Hors de cette vérification en attente, ce que je ferais avec plus de temps :
+Le code a été vérifié de bout en bout contre une vraie base (voir "Vérification contre la vraie
+base" ci-dessus) : les deux bugs trouvés sont corrigés et documentés. Ce qui reste, avec plus de
+temps :
 - Index uniques filtrés en base (véhicule+date, commande→ordre) : non ajoutés pour ne pas
   toucher au schéma ERP fourni ; l'unicité est garantie côté API par transaction + verrous,
   mais un index serait une seconde ligne de défense naturelle en production.
@@ -200,9 +237,8 @@ Hors de cette vérification en attente, ce que je ferais avec plus de temps :
 - Tests e2e en CI avec conteneur SQL Server éphémère (le test e2e existe déjà, gaté par
   `E2E_DB=true`, mais n'est pas branché dans une pipeline).
 - Tests de composants Vue (Vitest + @vue/test-utils) au-delà de `domain/permissions.ts`.
-- Bonus non traités : i18n FR/EN. Swagger est fait (`@nestjs/swagger`, `/api/docs`,
-  `@ApiHeader` pour `X-User-Id`, exemples de réponses d'erreur par route) mais pas encore
-  vérifié en conditions réelles, pour la même raison que le reste.
+- Bonus non traités : i18n FR/EN. Swagger est fait et vérifié (`@nestjs/swagger`, `/api/docs`,
+  `@ApiHeader` pour `X-User-Id`, exemples de réponses d'erreur par route).
 
 ## Temps réellement passé
 
