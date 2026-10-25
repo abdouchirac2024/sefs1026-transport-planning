@@ -20,9 +20,16 @@ export class VehiclesRepository {
     return result.recordset;
   }
 
-  /** Un véhicule par son code, actif ou non (utile pour vérifier VEHICLE_INACTIVE). */
-  async findByCode(code: string): Promise<VehicleDto | null> {
-    const result = await this.db.request().input('code', sql.NVarChar(20), code)
+  /**
+   * Un véhicule par son code, actif ou non (utile pour vérifier VEHICLE_INACTIVE).
+   * `tx` optionnel : exécute la requête dans une transaction déjà ouverte si fourni.
+   */
+  async findByCode(
+    code: string,
+    tx?: sql.Transaction,
+  ): Promise<VehicleDto | null> {
+    const request = tx ? this.db.requestIn(tx) : this.db.request();
+    const result = await request.input('code', sql.NVarChar(20), code)
       .query<VehicleDto>(`
         SELECT [Code]          AS code,
                [Plate No_]     AS plateNo,

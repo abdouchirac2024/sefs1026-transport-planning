@@ -18,14 +18,17 @@ interface TransportOrderListRow extends TransportOrderListItemDto {
 export class TransportOrdersRepository {
   constructor(private readonly db: DatabaseService) {}
 
+  private req(tx?: sql.Transaction): sql.Request {
+    return tx ? this.db.requestIn(tx) : this.db.request();
+  }
+
   /** Liste paginée des ordres, filtrable par statut et par date, avec poids total et nombre de lignes agrégés. */
   async findAll(
     query: TransportOrdersQueryDto,
   ): Promise<Page<TransportOrderListItemDto>> {
     const offset = toOffset(query.page, query.pageSize);
 
-    const result = await this.db
-      .request()
+    const result = await this.req()
       .input('status', sql.TinyInt, query.status ?? null)
       .input('date', sql.NVarChar(10), query.date ?? null)
       .input('offset', sql.Int, offset)
@@ -72,11 +75,16 @@ export class TransportOrdersRepository {
     return { items, total, page: query.page, pageSize: query.pageSize };
   }
 
-  /** Détail d'un ordre (véhicule, lignes, poids total, capacité restante), ou null si introuvable. */
-  async findDetail(no: string): Promise<TransportOrderDetailDto | null> {
-    const headerResult = await this.db
-      .request()
-      .input('no', sql.NVarChar(20), no).query<TransportOrderHeaderRow>(`
+  /**
+   * Détail d'un ordre (véhicule, lignes, poids total, capacité restante), ou null si introuvable.
+   * `tx` optionnel : relit l'état à jour dans la même transaction juste après une mutation.
+   */
+  async findDetail(
+    no: string,
+    tx?: sql.Transaction,
+  ): Promise<TransportOrderDetailDto | null> {
+    const headerResult = await this.req(tx).input('no', sql.NVarChar(20), no)
+      .query<TransportOrderHeaderRow>(`
         SELECT t.[No_]                              AS no,
                t.[Vehicle Code]                      AS vehicleCode,
                v.[Plate No_]                         AS plateNo,
@@ -96,9 +104,8 @@ export class TransportOrdersRepository {
       return null;
     }
 
-    const linesResult = await this.db
-      .request()
-      .input('no', sql.NVarChar(20), no).query<TransportOrderLineDto>(`
+    const linesResult = await this.req(tx).input('no', sql.NVarChar(20), no)
+      .query<TransportOrderLineDto>(`
         SELECT so.[No_]               AS salesOrderNo,
                so.[Customer Name]     AS customerName,
                so.[Delivery City]     AS deliveryCity,
@@ -110,5 +117,191 @@ export class TransportOrdersRepository {
       `);
 
     return toTransportOrderDetailDto(header, linesResult.recordset);
+  }
+
+  /** Date du jour selon le serveur SQL (source de vérité pour "date non passée", cf. DECISIONS.md). */
+  async getServerToday(tx: sql.Transaction): Promise<string> {
+    const result = await this.req(tx).query<{ today: string }>(`
+      SELECT CONVERT(char(10), CAST(GETDATE() AS date), 23) AS today
+    `);
+    return result.recordset[0].today;
+  }
+
+  /**
+   * Verrou applicatif exclusif, tenu pour la durée de la transaction : sérialise toutes les
+   * créations d'ordre entre elles, pour que la vérification "un seul ordre par véhicule et
+   * par date" (étape suivante) soit fiable même en cas de requêtes concurrentes.
+   */
+  async acquireCreateLock(tx: sql.Transaction): Promise<void> {
+    await this.req(tx)
+      .input('resource', sql.NVarChar(50), 'transport-order:create')
+      .query(
+        `EXEC sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction'`,
+      );
+  }
+
+  /** Un ordre existe-t-il déjà pour ce véhicule à cette date ? */
+  async existsForVehicleAndDate(
+    vehicleCode: string,
+    deliveryDate: string,
+    tx: sql.Transaction,
+  ): Promise<boolean> {
+    const result = await this.req(tx)
+      .input('vehicleCode', sql.NVarChar(20), vehicleCode)
+      .input('deliveryDate', sql.NVarChar(10), deliveryDate).query(`
+        SELECT 1 AS found
+        FROM [Transport Order]
+        WHERE [Vehicle Code] = @vehicleCode
+          AND [Delivery Date] = CONVERT(date, @deliveryDate, 23)
+      `);
+    return result.recordset.length > 0;
+  }
+
+  /** Numéro du dernier ordre créé (0 si aucun), pour calculer le suivant avec nextTransportOrderNo(). */
+  async getLastNumber(tx: sql.Transaction): Promise<number> {
+    const result = await this.req(tx).query<{ lastNumber: number }>(`
+      SELECT ISNULL(MAX(CAST(SUBSTRING([No_], 4, 16) AS int)), 0) AS lastNumber
+      FROM [Transport Order]
+      WHERE [No_] LIKE N'TO-[0-9]%'
+    `);
+    return result.recordset[0].lastNumber;
+  }
+
+  async insert(
+    no: string,
+    vehicleCode: string,
+    deliveryDate: string,
+    createdBy: string,
+    tx: sql.Transaction,
+  ): Promise<void> {
+    await this.req(tx)
+      .input('no', sql.NVarChar(20), no)
+      .input('vehicleCode', sql.NVarChar(20), vehicleCode)
+      .input('deliveryDate', sql.NVarChar(10), deliveryDate)
+      .input('createdBy', sql.NVarChar(50), createdBy).query(`
+        INSERT INTO [Transport Order] ([No_], [Vehicle Code], [Delivery Date], [Status], [Created By])
+        VALUES (@no, @vehicleCode, CONVERT(date, @deliveryDate, 23), 0, @createdBy)
+      `);
+  }
+
+  /**
+   * Verrouille la ligne de l'ordre pour la durée de la transaction (empêche deux mutations
+   * concurrentes sur le même ordre). Renvoie son statut et sa version, ou null si introuvable.
+   */
+  async lockForUpdate(
+    no: string,
+    tx: sql.Transaction,
+  ): Promise<{ status: number; version: string } | null> {
+    const result = await this.req(tx).input('no', sql.NVarChar(20), no).query<{
+      status: number;
+      version: string;
+    }>(`
+        SELECT [Status]                             AS status,
+               CONVERT(varchar(18), [timestamp], 1)  AS version
+        FROM [Transport Order] WITH (UPDLOCK, ROWLOCK)
+        WHERE [No_] = @no
+      `);
+    return result.recordset[0] ?? null;
+  }
+
+  /** Capacité du véhicule affecté à cet ordre. */
+  async getVehicleCapacity(no: string, tx: sql.Transaction): Promise<number> {
+    const result = await this.req(tx).input('no', sql.NVarChar(20), no).query<{
+      capacityKg: number;
+    }>(`
+        SELECT v.[Capacity (kg)] AS capacityKg
+        FROM [Transport Order] t
+        JOIN [Vehicle] v ON v.[Code] = t.[Vehicle Code]
+        WHERE t.[No_] = @no
+      `);
+    return result.recordset[0].capacityKg;
+  }
+
+  /** Somme des poids des commandes déjà affectées à cet ordre. */
+  async sumCurrentWeight(no: string, tx: sql.Transaction): Promise<number> {
+    const result = await this.req(tx).input('no', sql.NVarChar(20), no).query<{
+      currentWeightKg: number;
+    }>(`
+        SELECT ISNULL(SUM(so.[Total Weight (kg)]), 0) AS currentWeightKg
+        FROM [Transport Order Line] l
+        JOIN [Sales Order] so ON so.[No_] = l.[Sales Order No_]
+        WHERE l.[Transport Order No_] = @no
+      `);
+    return result.recordset[0].currentWeightKg;
+  }
+
+  /** Nombre de commandes actuellement affectées à cet ordre. */
+  async countLines(no: string, tx: sql.Transaction): Promise<number> {
+    const result = await this.req(tx).input('no', sql.NVarChar(20), no).query<{
+      lineCount: number;
+    }>(`
+        SELECT COUNT(*) AS lineCount
+        FROM [Transport Order Line]
+        WHERE [Transport Order No_] = @no
+      `);
+    return result.recordset[0].lineCount;
+  }
+
+  async insertLines(
+    no: string,
+    salesOrderNos: string[],
+    tx: sql.Transaction,
+  ): Promise<void> {
+    await this.req(tx)
+      .input('no', sql.NVarChar(20), no)
+      .input('nos', sql.NVarChar(sql.MAX), JSON.stringify(salesOrderNos))
+      .query(`
+        INSERT INTO [Transport Order Line] ([Transport Order No_], [Sales Order No_])
+        SELECT @no, [value] FROM OPENJSON(@nos)
+      `);
+  }
+
+  /** Supprime une ligne. Renvoie true si une ligne a effectivement été supprimée. */
+  async deleteLine(
+    no: string,
+    salesOrderNo: string,
+    tx: sql.Transaction,
+  ): Promise<boolean> {
+    const result = await this.req(tx)
+      .input('no', sql.NVarChar(20), no)
+      .input('salesOrderNo', sql.NVarChar(20), salesOrderNo).query(`
+        DELETE FROM [Transport Order Line]
+        WHERE [Transport Order No_] = @no AND [Sales Order No_] = @salesOrderNo
+      `);
+    return result.rowsAffected[0] > 0;
+  }
+
+  async markValidated(
+    no: string,
+    validatedBy: string,
+    tx: sql.Transaction,
+  ): Promise<void> {
+    await this.req(tx)
+      .input('no', sql.NVarChar(20), no)
+      .input('validatedBy', sql.NVarChar(50), validatedBy).query(`
+        UPDATE [Transport Order] SET [Status] = 1, [Validated By] = @validatedBy WHERE [No_] = @no
+      `);
+  }
+
+  async markDeparted(no: string, tx: sql.Transaction): Promise<void> {
+    await this.req(tx).input('no', sql.NVarChar(20), no).query(`
+        UPDATE [Transport Order] SET [Status] = 2 WHERE [No_] = @no
+      `);
+  }
+
+  /** Passe au statut En livraison (2) toutes les commandes de cet ordre. */
+  async markLinesInDelivery(no: string, tx: sql.Transaction): Promise<void> {
+    await this.req(tx).input('no', sql.NVarChar(20), no).query(`
+        UPDATE [Sales Order]
+        SET [Status] = 2
+        WHERE [No_] IN (SELECT [Sales Order No_] FROM [Transport Order Line] WHERE [Transport Order No_] = @no)
+      `);
+  }
+
+  /** Incrémente le rowversion de l'ordre sans changer sa valeur métier (bump de version optimiste). */
+  async bumpVersion(no: string, tx: sql.Transaction): Promise<void> {
+    await this.req(tx).input('no', sql.NVarChar(20), no).query(`
+        UPDATE [Transport Order] SET [Status] = [Status] WHERE [No_] = @no
+      `);
   }
 }

@@ -58,4 +58,59 @@ export class SalesOrdersRepository {
     `);
     return result.recordset.map((row) => row.city);
   }
+
+  /**
+   * Commandes demandées qui existent réellement en base, verrouillées pour la durée de la
+   * transaction (WITH UPDLOCK, ROWLOCK) : sérialise les tentatives d'affectation concurrentes
+   * sur les mêmes commandes. Celles absentes de `requestedNos` par rapport au résultat sont
+   * considérées introuvables par assertPlannable.
+   */
+  async findByNosForUpdate(
+    requestedNos: string[],
+    tx: sql.Transaction,
+  ): Promise<Array<{ no: string; status: number; totalWeightKg: number }>> {
+    const result = await this.db
+      .requestIn(tx)
+      .input('nos', sql.NVarChar(sql.MAX), JSON.stringify(requestedNos)).query<{
+      no: string;
+      status: number;
+      totalWeightKg: number;
+    }>(`
+        SELECT [No_]               AS no,
+               [Status]             AS status,
+               [Total Weight (kg)]  AS totalWeightKg
+        FROM [Sales Order] WITH (UPDLOCK, ROWLOCK)
+        WHERE [No_] IN (SELECT [value] FROM OPENJSON(@nos))
+      `);
+    return result.recordset;
+  }
+
+  /**
+   * Passe les commandes données au statut Planifiée (1), uniquement celles encore À planifier (0).
+   * Renvoie le nombre de lignes effectivement mises à jour : si inférieur au nombre demandé,
+   * une affectation concurrente a eu lieu entre la vérification et cette écriture (garde-fou).
+   */
+  async markPlanned(
+    salesOrderNos: string[],
+    tx: sql.Transaction,
+  ): Promise<number> {
+    const result = await this.db
+      .requestIn(tx)
+      .input('nos', sql.NVarChar(sql.MAX), JSON.stringify(salesOrderNos))
+      .query(`
+        UPDATE [Sales Order]
+        SET [Status] = 1
+        WHERE [No_] IN (SELECT [value] FROM OPENJSON(@nos))
+          AND [Status] = 0
+      `);
+    return result.rowsAffected[0];
+  }
+
+  /** Repasse une commande au statut À planifier (0), suite au retrait d'une ligne. */
+  async markToPlan(salesOrderNo: string, tx: sql.Transaction): Promise<void> {
+    await this.db.requestIn(tx).input('no', sql.NVarChar(20), salesOrderNo)
+      .query(`
+        UPDATE [Sales Order] SET [Status] = 0 WHERE [No_] = @no
+      `);
+  }
 }
