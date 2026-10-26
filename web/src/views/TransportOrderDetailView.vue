@@ -86,89 +86,110 @@ function onLinesAdded(): void {
 </script>
 
 <template>
-  <div>
-    <h2>Ordre {{ no }}</h2>
+  <div class="order-detail">
+    <header class="page-header">
+      <div class="page-header__icon"><i class="pi pi-file" /></div>
+      <div>
+        <h2>Ordre {{ no }}</h2>
+        <p>Véhicule, commandes et actions disponibles selon le statut et votre rôle.</p>
+      </div>
+    </header>
 
     <AsyncState :loading="store.detailLoading" :error="store.detailError" @retry="store.loadDetail(no)">
       <div v-if="order" class="detail">
-        <section class="summary">
-          <div>
-            <strong>Véhicule</strong>
-            <p>{{ order.vehicleCode }} ({{ order.plateNo }})</p>
+        <section class="info-card">
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-item__label"><i class="pi pi-truck" /> Véhicule</span>
+              <span class="info-item__value">{{ order.vehicleCode }} ({{ order.plateNo }})</span>
+            </div>
+            <div class="info-item">
+              <span class="info-item__label"><i class="pi pi-calendar" /> Date de livraison</span>
+              <span class="info-item__value">{{ order.deliveryDate }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-item__label"><i class="pi pi-flag" /> Statut</span>
+              <StatusTag kind="transportOrder" :status="order.status" />
+            </div>
+            <div class="info-item">
+              <span class="info-item__label"><i class="pi pi-user" /> Créé par</span>
+              <span class="info-item__value">{{ order.createdBy }}</span>
+            </div>
+            <div v-if="order.validatedBy" class="info-item">
+              <span class="info-item__label"><i class="pi pi-verified" /> Validé par</span>
+              <span class="info-item__value">{{ order.validatedBy }}</span>
+            </div>
           </div>
-          <div>
-            <strong>Date de livraison</strong>
-            <p>{{ order.deliveryDate }}</p>
+
+          <div class="gauge-block">
+            <span class="gauge-block__label">Remplissage</span>
+            <CapacityGauge :capacity-kg="order.capacityKg" :total-weight-kg="order.totalWeightKg" />
           </div>
-          <div>
-            <strong>Statut</strong>
-            <p><StatusTag kind="transportOrder" :status="order.status" /></p>
-          </div>
-          <div>
-            <strong>Créé par</strong>
-            <p>{{ order.createdBy }}</p>
-          </div>
-          <div v-if="order.validatedBy">
-            <strong>Validé par</strong>
-            <p>{{ order.validatedBy }}</p>
+
+          <Message v-if="store.mutationError" severity="error" :closable="false">
+            {{ store.mutationError.message }}
+          </Message>
+
+          <div class="actions">
+            <Button
+              v-if="showEditLines"
+              label="Ajouter des commandes"
+              icon="pi pi-plus"
+              @click="addLinesDialogVisible = true"
+            />
+            <Button
+              v-if="showValidate"
+              label="Valider"
+              icon="pi pi-check"
+              severity="success"
+              :loading="store.mutating"
+              @click="confirmValidate"
+            />
+            <Button
+              v-if="showDepart"
+              label="Marquer parti"
+              icon="pi pi-send"
+              severity="info"
+              :loading="store.mutating"
+              @click="confirmDepart"
+            />
           </div>
         </section>
 
-        <section>
-          <strong>Remplissage</strong>
-          <CapacityGauge :capacity-kg="order.capacityKg" :total-weight-kg="order.totalWeightKg" />
-        </section>
-
-        <Message v-if="store.mutationError" severity="error" :closable="false">
-          {{ store.mutationError.message }}
-        </Message>
-
-        <section class="actions">
-          <Button
-            v-if="showEditLines"
-            label="Ajouter des commandes"
-            icon="pi pi-plus"
-            @click="addLinesDialogVisible = true"
-          />
-          <Button
-            v-if="showValidate"
-            label="Valider"
-            icon="pi pi-check"
-            severity="success"
-            :loading="store.mutating"
-            @click="confirmValidate"
-          />
-          <Button
-            v-if="showDepart"
-            label="Marquer parti"
-            icon="pi pi-send"
-            severity="info"
-            :loading="store.mutating"
-            @click="confirmDepart"
-          />
-        </section>
-
-        <section>
-          <strong>Commandes ({{ order.lines.length }})</strong>
-          <DataTable :value="order.lines" data-key="salesOrderNo">
-            <Column field="salesOrderNo" header="Commande" />
-            <Column field="customerName" header="Client" />
-            <Column field="deliveryCity" header="Ville" />
-            <Column field="totalWeightKg" header="Poids (kg)">
-              <template #body="slotProps">{{ slotProps.data.totalWeightKg.toFixed(2) }}</template>
-            </Column>
-            <Column v-if="showEditLines" header-style="width: 4rem">
-              <template #body="slotProps">
-                <Button
-                  icon="pi pi-trash"
-                  text
-                  severity="danger"
-                  :disabled="store.mutating"
-                  @click="removeLine(slotProps.data.salesOrderNo)"
-                />
-              </template>
-            </Column>
-          </DataTable>
+        <section class="table-card">
+          <h3 class="table-card__title">Commandes ({{ order.lines.length }})</h3>
+          <div class="table-scroll">
+            <DataTable :value="order.lines" data-key="salesOrderNo" striped-rows class="lines-table">
+              <Column field="salesOrderNo" header="Commande">
+                <template #body="slotProps">
+                  <span class="order-no">{{ slotProps.data.salesOrderNo }}</span>
+                </template>
+              </Column>
+              <Column field="customerName" header="Client" />
+              <Column field="deliveryCity" header="Ville">
+                <template #body="slotProps">
+                  <span class="city-cell"><i class="pi pi-map-marker" />{{ slotProps.data.deliveryCity }}</span>
+                </template>
+              </Column>
+              <Column field="totalWeightKg" header="Poids (kg)" header-style="text-align: right">
+                <template #body="slotProps">
+                  <span class="weight-cell">{{ slotProps.data.totalWeightKg.toFixed(2) }}</span>
+                </template>
+              </Column>
+              <Column v-if="showEditLines" header-style="width: 4rem">
+                <template #body="slotProps">
+                  <Button
+                    icon="pi pi-trash"
+                    text
+                    rounded
+                    severity="danger"
+                    :disabled="store.mutating"
+                    @click="removeLine(slotProps.data.salesOrderNo)"
+                  />
+                </template>
+              </Column>
+            </DataTable>
+          </div>
           <p v-if="order.lines.length === 0" class="empty-lines">Aucune commande dans cet ordre.</p>
         </section>
       </div>
@@ -179,27 +200,97 @@ function onLinesAdded(): void {
 </template>
 
 <style scoped>
+.order-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+}
+
+.page-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--p-primary-100, var(--p-highlight-background));
+  color: var(--p-primary-color);
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.page-header h2 {
+  margin: 0 0 0.2rem;
+  font-size: 1.4rem;
+}
+
+.page-header p {
+  margin: 0;
+  color: var(--p-text-muted-color);
+  font-size: 0.9rem;
+}
+
 .detail {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  max-width: 48rem;
+  gap: 1.25rem;
 }
 
-.summary {
+.info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  background: var(--p-content-background, #fff);
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 12px;
+}
+
+.info-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: 1rem;
 }
 
-.summary strong {
-  display: block;
-  font-size: 0.8rem;
-  color: var(--p-text-muted-color);
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
-.summary p {
-  margin: 0.2rem 0 0;
+.info-item__label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--p-text-muted-color);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.info-item__value {
+  font-size: 0.95rem;
+}
+
+.gauge-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.gauge-block__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--p-text-muted-color);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .actions {
@@ -208,7 +299,77 @@ function onLinesAdded(): void {
   flex-wrap: wrap;
 }
 
-.empty-lines {
+.table-card {
+  padding: 1.25rem;
+  background: var(--p-content-background, #fff);
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 12px;
+}
+
+.table-card__title {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  border-radius: 8px;
+}
+
+.lines-table {
+  min-width: 32rem;
+}
+
+.order-no {
+  font-weight: 600;
+  color: var(--p-primary-color);
+}
+
+.city-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   color: var(--p-text-muted-color);
+}
+
+.city-cell i {
+  font-size: 0.8rem;
+}
+
+.weight-cell {
+  display: block;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty-lines {
+  margin: 1rem 0 0;
+  color: var(--p-text-muted-color);
+}
+
+@media (max-width: 640px) {
+  .page-header__icon {
+    width: 38px;
+    height: 38px;
+    font-size: 1.1rem;
+  }
+
+  .page-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .info-card,
+  .table-card {
+    padding: 1rem;
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actions :deep(.p-button) {
+    width: 100%;
+  }
 }
 </style>
