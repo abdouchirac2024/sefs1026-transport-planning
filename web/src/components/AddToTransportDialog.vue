@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { toApiError, type ApiError } from '../api/http-client';
-import { addLines, createTransportOrder, fetchTransportOrders } from '../api/transport-orders';
-import type { SalesOrderToPlan, TransportOrderListItem } from '../domain/types';
+import { addLines, createTransportOrder } from '../api/transport-orders';
+import type { SalesOrderToPlan } from '../domain/types';
 import { useTransportOrdersStore } from '../stores/transport-orders';
 import { useVehiclesStore } from '../stores/vehicles';
 
@@ -29,10 +29,6 @@ const transportOrdersStore = useTransportOrdersStore();
 type Mode = 'existing' | 'new';
 const mode = ref<Mode>('existing');
 
-const draftOrders = ref<TransportOrderListItem[]>([]);
-const draftOrdersLoading = ref(false);
-const draftOrdersError = ref<ApiError | null>(null);
-
 const selectedDraftNo = ref<string | null>(null);
 const selectedVehicleCode = ref<string | null>(null);
 const deliveryDate = ref<string>('');
@@ -44,7 +40,9 @@ const todayIso = new Date().toISOString().slice(0, 10);
 
 const selectedWeightKg = computed(() => props.selectedOrders.reduce((sum, so) => sum + so.totalWeightKg, 0));
 
-const selectedDraft = computed(() => draftOrders.value.find((d) => d.no === selectedDraftNo.value) ?? null);
+const selectedDraft = computed(
+  () => transportOrdersStore.draftOrders.find((d) => d.no === selectedDraftNo.value) ?? null,
+);
 
 const remainingCapacityKg = computed(() => {
   if (mode.value === 'existing' && selectedDraft.value) {
@@ -83,19 +81,6 @@ const canSubmit = computed(() => {
   return selectedVehicleCode.value !== null && deliveryDate.value !== '';
 });
 
-async function loadDraftOrders(): Promise<void> {
-  draftOrdersLoading.value = true;
-  draftOrdersError.value = null;
-  try {
-    const result = await fetchTransportOrders({ status: 0, page: 1, pageSize: 100 });
-    draftOrders.value = result.items;
-  } catch (e) {
-    draftOrdersError.value = toApiError(e);
-  } finally {
-    draftOrdersLoading.value = false;
-  }
-}
-
 watch(
   () => props.visible,
   (visible) => {
@@ -105,7 +90,7 @@ watch(
       selectedVehicleCode.value = null;
       deliveryDate.value = '';
       submitError.value = null;
-      void loadDraftOrders();
+      void transportOrdersStore.loadDraftOrders();
       void vehiclesStore.load();
     }
   },
@@ -167,13 +152,19 @@ function close(): void {
     </div>
 
     <div v-if="mode === 'existing'" class="mode-panel">
-      <div v-if="draftOrdersLoading" class="center"><ProgressSpinner style="width: 24px; height: 24px" /></div>
-      <Message v-else-if="draftOrdersError" severity="error" :closable="false">{{ draftOrdersError.message }}</Message>
-      <p v-else-if="draftOrders.length === 0">Aucun ordre Brouillon disponible. Créez-en un nouveau.</p>
+      <div v-if="transportOrdersStore.draftOrdersLoading" class="center">
+        <ProgressSpinner style="width: 24px; height: 24px" />
+      </div>
+      <Message v-else-if="transportOrdersStore.draftOrdersError" severity="error" :closable="false">
+        {{ transportOrdersStore.draftOrdersError.message }}
+      </Message>
+      <p v-else-if="transportOrdersStore.draftOrders.length === 0">
+        Aucun ordre Brouillon disponible. Créez-en un nouveau.
+      </p>
       <Select
         v-else
         v-model="selectedDraftNo"
-        :options="draftOrders"
+        :options="transportOrdersStore.draftOrders"
         option-label="no"
         option-value="no"
         placeholder="Choisir un ordre"

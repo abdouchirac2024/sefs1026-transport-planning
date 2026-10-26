@@ -65,10 +65,35 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
     void load(true);
   }
 
-  /** Marque la liste comme périmée sans la recharger : à utiliser quand une mutation change un
-   * ordre (statut, lignes) ou en crée un nouveau par un chemin qui ne repasse pas par `load()`. */
+  // --- Ordres Brouillon (sélecteur du dialogue "Ajouter à un transport") ---
+  const draftOrders = ref<TransportOrderListItem[]>([]);
+  const draftOrdersLoading = ref(false);
+  const draftOrdersError = ref<ApiError | null>(null);
+  let draftOrdersLoaded = false;
+
+  async function loadDraftOrders(force = false): Promise<void> {
+    if (draftOrdersLoaded && !force) {
+      return;
+    }
+    draftOrdersLoading.value = true;
+    draftOrdersError.value = null;
+    try {
+      const result = await fetchTransportOrders({ status: 0, page: 1, pageSize: 100 });
+      draftOrders.value = result.items;
+      draftOrdersLoaded = true;
+    } catch (e) {
+      draftOrdersError.value = toApiError(e);
+    } finally {
+      draftOrdersLoading.value = false;
+    }
+  }
+
+  /** Marque les listes (principale + ordres Brouillon) comme périmées sans les recharger : à
+   * utiliser quand une mutation change un ordre (statut, lignes) ou en crée un nouveau par un
+   * chemin qui ne repasse pas par `load()`. Le prochain accès ira rechercher les données à jour. */
   function invalidate(): void {
     loaded = false;
+    draftOrdersLoaded = false;
   }
 
   // --- Détail + mutations ---
@@ -158,6 +183,10 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
     setDate,
     setPage,
     invalidate,
+    draftOrders,
+    draftOrdersLoading,
+    draftOrdersError,
+    loadDraftOrders,
     current,
     detailLoading,
     detailError,
