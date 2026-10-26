@@ -101,6 +101,71 @@ describeWithDb('Scénarios section 8 (e2e)', () => {
     });
   });
 
+  describe('Liste des ordres de transport (GET /transport-orders)', () => {
+    beforeAll(() => resetDatabase());
+
+    it('sans filtre, renvoie les 4 ordres seedés avec poids total et nombre de lignes agrégés', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/transport-orders')
+        .set('X-User-Id', 'diane')
+        .expect(200);
+      expect(response.body.total).toBe(4);
+      expect(response.body.items).toHaveLength(4);
+
+      const to0002 = response.body.items.find(
+        (o: { no: string }) => o.no === 'TO-0002',
+      );
+      expect(to0002.vehicleCode).toBe('VH-03');
+      expect(to0002.status).toBe(1);
+      expect(to0002.lineCount).toBe(3);
+    });
+
+    it('filtre par statut (0 = Brouillon) -> TO-0003 et TO-0004 seulement', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/transport-orders')
+        .query({ status: 0 })
+        .set('X-User-Id', 'diane')
+        .expect(200);
+      expect(response.body.total).toBe(2);
+      expect(
+        response.body.items.map((o: { no: string }) => o.no).sort(),
+      ).toEqual(['TO-0003', 'TO-0004']);
+    });
+
+    it('filtre par date (demain) -> TO-0002 et TO-0003 seulement', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/transport-orders')
+        .query({ date: TOMORROW })
+        .set('X-User-Id', 'diane')
+        .expect(200);
+      expect(response.body.total).toBe(2);
+      expect(
+        response.body.items.map((o: { no: string }) => o.no).sort(),
+      ).toEqual(['TO-0002', 'TO-0003']);
+    });
+
+    it('pagine correctement (pageSize=1 -> 1 item par page, total inchangé)', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/transport-orders')
+        .query({ page: 1, pageSize: 1 })
+        .set('X-User-Id', 'diane')
+        .expect(200);
+      expect(response.body.total).toBe(4);
+      expect(response.body.items).toHaveLength(1);
+      expect(response.body.page).toBe(1);
+      expect(response.body.pageSize).toBe(1);
+    });
+
+    it('refuse un statut hors [0,1,2] -> 400 VALIDATION_ERROR', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/transport-orders')
+        .query({ status: 5 })
+        .set('X-User-Id', 'diane')
+        .expect(400);
+      expect(response.body.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
   describe('Création d ordres', () => {
     // Un seul test insère réellement (VH-05 aujourd'hui) ; les autres sont rejetés avant
     // toute écriture. Un beforeAll suffit : aucun des quatre ne dépend qu'un autre ait (ou
