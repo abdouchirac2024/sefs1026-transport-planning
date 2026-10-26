@@ -75,17 +75,19 @@ npm run build                 # vérifie aussi le typage (vue-tsc)
 ```
 
 Sans `E2E_DB=true`, les tests e2e API sont ignorés (`describe.skip`) pour que
-`npm run test:e2e` reste vert même sans base disponible (confirmé : 26 tests skip, exit
+`npm run test:e2e` reste vert même sans base disponible (confirmé : 31 tests skip, exit
 code 0). `test/section8-scenarios.e2e-spec.ts` couvre tous les scénarios de la section 8 du
-skill (lectures, création, capacité, tout-ou-rien, rôles, transitions de statut, et le cas de
-concurrence — deux ajouts simultanés de la même commande dans deux ordres), regroupés en 6
-`describe` thématiques **indépendants** : chaque groupe relance `db:reset` (`beforeAll` ou
-`beforeEach` selon que des tests du groupe mutent ou non les mêmes lignes partagées), et
-aucun test ne dépend de l'effet d'un autre — chacun peut être lancé seul.
+skill (lectures, liste paginée des ordres avec filtres statut/date, création, capacité,
+tout-ou-rien, rôles, transitions de statut, et le cas de concurrence — deux ajouts simultanés
+de la même commande dans deux ordres), regroupés en 7 `describe` thématiques
+**indépendants** : chaque groupe relance `db:reset` (`beforeAll` ou `beforeEach` selon que
+des tests du groupe mutent ou non les mêmes lignes partagées), et aucun test ne dépend de
+l'effet d'un autre — chacun peut être lancé seul.
 
 **Vérifié contre une vraie instance SQL Server** (voir "Vérification contre la vraie base") :
-26/26 tests e2e passent (21 scénarios de la section 8 + 2 tests If-Match + 3 tests auth/vehicles
-de base), 81/81 tests unitaires API, 30/30 tests unitaires front (dont les stores Pinia
+31/31 tests e2e passent (21 scénarios de la section 8 + 2 tests If-Match + 3 tests
+auth/vehicles de base + 5 tests de la liste paginée `GET /transport-orders`, filtres statut/
+date inclus), 81/81 tests unitaires API, 30/30 tests unitaires front (dont les stores Pinia
 `sales-orders`/`transport-orders` : cache par page, invalidation après mutation).
 
 ### Utilisateurs de test
