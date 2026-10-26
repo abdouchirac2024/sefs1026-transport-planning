@@ -21,5 +21,6 @@ export interface TransportOrderHeaderRow {
 export interface TransportOrderDetailDto extends TransportOrderHeaderRow {
   totalWeightKg: number;
   remainingCapacityKg: number;
+  lineCount: number;
   lines: TransportOrderLineDto[];
 }

@@ -22,6 +22,7 @@ export function toTransportOrderDetailDto(
     ...header,
     totalWeightKg,
     remainingCapacityKg,
+    lineCount: lines.length,
     lines,
   };
 }

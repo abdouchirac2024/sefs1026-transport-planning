@@ -84,6 +84,33 @@ describe('toTransportOrderDetailDto', () => {
     expect(dto.lines).toEqual([]);
   });
 
+  it('renvoie lineCount égal au nombre de lignes (nécessaire à assertCanValidate côté API et à canValidate côté front)', () => {
+    const lines: TransportOrderLineDto[] = [
+      {
+        salesOrderNo: 'SO-1006',
+        customerName: 'A',
+        deliveryCity: 'Bafoussam',
+        totalWeightKg: 640,
+      },
+      {
+        salesOrderNo: 'SO-1007',
+        customerName: 'B',
+        deliveryCity: 'Bafoussam',
+        totalWeightKg: 720,
+      },
+    ];
+
+    const dto = toTransportOrderDetailDto(header, lines);
+
+    expect(dto.lineCount).toBe(2);
+  });
+
+  it('renvoie lineCount à zéro pour un ordre sans ligne', () => {
+    const dto = toTransportOrderDetailDto(header, []);
+
+    expect(dto.lineCount).toBe(0);
+  });
+
   it('arrondit à 2 décimales sans erreur d arrondi flottant (60,25 + 85)', () => {
     const lines: TransportOrderLineDto[] = [
       {
