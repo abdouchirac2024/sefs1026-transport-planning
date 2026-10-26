@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import AddToTransportDialog from '../components/AddToTransportDialog.vue';
 import AsyncState from '../components/AsyncState.vue';
+import { sumWeightKg } from '../domain/weight';
 import type { SalesOrderToPlan } from '../domain/types';
 import { useSalesOrdersStore } from '../stores/sales-orders';
 
@@ -44,18 +45,10 @@ function onSuccess(transportOrderNo: string): void {
     life: 4000,
   });
   selectedOrders.value = [];
-  store.invalidate();
-  void store.load();
+  store.reload();
 }
 
-function retryLoad(): void {
-  store.invalidate();
-  void store.load();
-}
-
-function selectedWeightKg(): number {
-  return selectedOrders.value.reduce((sum, so) => sum + so.totalWeightKg, 0);
-}
+const selectedWeightKg = computed(() => sumWeightKg(selectedOrders.value));
 </script>
 
 <template>
@@ -85,7 +78,7 @@ function selectedWeightKg(): number {
 
       <Tag v-if="selectedOrders.length > 0" severity="info" class="selection-tag">
         <i class="pi pi-check-circle" />
-        {{ selectedOrders.length }} sélectionnée(s) — {{ selectedWeightKg().toFixed(2) }} kg
+        {{ selectedOrders.length }} sélectionnée(s) — {{ selectedWeightKg.toFixed(2) }} kg
       </Tag>
 
       <Button
@@ -102,7 +95,7 @@ function selectedWeightKg(): number {
       :error="store.error"
       :empty="!store.loading && !store.error && store.items.length === 0"
       empty-message="Aucune commande à planifier pour le moment."
-      @retry="retryLoad"
+      @retry="store.reload"
     >
       <section class="table-card">
         <div class="table-scroll">

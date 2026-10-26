@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { toApiError, type ApiError } from '../api/http-client';
 import { addLines, createTransportOrder } from '../api/transport-orders';
 import type { SalesOrderToPlan } from '../domain/types';
+import { sumWeightKg } from '../domain/weight';
 import { useTransportOrdersStore } from '../stores/transport-orders';
 import { useVehiclesStore } from '../stores/vehicles';
 
@@ -38,7 +39,7 @@ const submitError = ref<ApiError | null>(null);
 
 const todayIso = new Date().toISOString().slice(0, 10);
 
-const selectedWeightKg = computed(() => props.selectedOrders.reduce((sum, so) => sum + so.totalWeightKg, 0));
+const selectedWeightKg = computed(() => sumWeightKg(props.selectedOrders));
 
 const selectedDraft = computed(
   () => transportOrdersStore.draftOrders.find((d) => d.no === selectedDraftNo.value) ?? null,

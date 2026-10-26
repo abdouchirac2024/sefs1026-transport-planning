@@ -52,11 +52,6 @@ function onCreated(no: string): void {
   store.invalidate();
   void router.push({ name: 'transport-order-detail', params: { no } });
 }
-
-function retryLoad(): void {
-  store.invalidate();
-  void store.load();
-}
 </script>
 
 <template>
@@ -82,7 +77,7 @@ function retryLoad(): void {
       :error="store.error"
       :empty="!store.loading && !store.error && store.items.length === 0"
       empty-message="Aucun ordre de transport pour ces filtres."
-      @retry="retryLoad"
+      @retry="store.reload"
     >
       <DataTable
         :value="store.items"

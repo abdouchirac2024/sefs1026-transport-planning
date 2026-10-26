@@ -3,7 +3,6 @@ import { ref } from 'vue';
 import { toApiError, type ApiError } from '../api/http-client';
 import {
   addLines,
-  createTransportOrder,
   departTransportOrder,
   fetchTransportOrder,
   fetchTransportOrders,
@@ -11,6 +10,7 @@ import {
   validateTransportOrder,
 } from '../api/transport-orders';
 import type { TransportOrderDetail, TransportOrderListItem } from '../domain/types';
+import { createPageCache } from './page-cache';
 
 export const useTransportOrdersStore = defineStore('transportOrders', () => {
   const items = ref<TransportOrderListItem[]>([]);
@@ -22,20 +22,10 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
   const loading = ref(false);
   const error = ref<ApiError | null>(null);
 
-  const pageCache = new Map<number, { items: TransportOrderListItem[]; total: number }>();
-  let cachedFilterKey: string | undefined;
-
-  function filterKey(): string {
-    return `${status.value ?? ''}|${date.value ?? ''}`;
-  }
+  const pageCache = createPageCache<{ items: TransportOrderListItem[]; total: number }>();
 
   async function load(): Promise<void> {
-    const key = filterKey();
-    if (cachedFilterKey !== key) {
-      pageCache.clear();
-      cachedFilterKey = key;
-    }
-    const cached = pageCache.get(page.value);
+    const cached = pageCache.get(`${status.value ?? ''}|${date.value ?? ''}`, page.value);
     if (cached) {
       items.value = cached.items;
       total.value = cached.total;
@@ -104,6 +94,11 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
     draftOrdersLoaded = false;
   }
 
+  function reload(): void {
+    invalidate();
+    void load();
+  }
+
   const current = ref<TransportOrderDetail | null>(null);
   const detailLoading = ref(false);
   const detailError = ref<ApiError | null>(null);
@@ -135,12 +130,6 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
     } finally {
       mutating.value = false;
     }
-  }
-
-  async function create(input: { vehicleCode: string; deliveryDate: string }): Promise<TransportOrderDetail> {
-    const created = await createTransportOrder(input);
-    current.value = created;
-    return created;
   }
 
   async function addLinesToCurrent(salesOrderNos: string[]): Promise<void> {
@@ -189,6 +178,7 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
     setDate,
     setPage,
     invalidate,
+    reload,
     draftOrders,
     draftOrdersLoading,
     draftOrdersError,
@@ -199,7 +189,6 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
     mutating,
     mutationError,
     loadDetail,
-    create,
     addLinesToCurrent,
     removeLineFromCurrent,
     validateCurrent,

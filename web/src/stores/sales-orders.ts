@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { toApiError, type ApiError } from '../api/http-client';
 import { fetchCities, fetchSalesOrdersToPlan } from '../api/sales-orders';
 import type { SalesOrderToPlan } from '../domain/types';
+import { createPageCache } from './page-cache';
 
 export const useSalesOrdersStore = defineStore('salesOrders', () => {
   const items = ref<SalesOrderToPlan[]>([]);
@@ -16,15 +17,10 @@ export const useSalesOrdersStore = defineStore('salesOrders', () => {
   const cities = ref<string[]>([]);
   let citiesLoaded = false;
 
-  const pageCache = new Map<number, { items: SalesOrderToPlan[]; total: number }>();
-  let cachedCity: string | undefined;
+  const pageCache = createPageCache<{ items: SalesOrderToPlan[]; total: number }>();
 
   async function load(): Promise<void> {
-    if (cachedCity !== city.value) {
-      pageCache.clear();
-      cachedCity = city.value;
-    }
-    const cached = pageCache.get(page.value);
+    const cached = pageCache.get(city.value ?? '', page.value);
     if (cached) {
       items.value = cached.items;
       total.value = cached.total;
@@ -70,6 +66,11 @@ export const useSalesOrdersStore = defineStore('salesOrders', () => {
     pageCache.clear();
   }
 
+  function reload(): void {
+    invalidate();
+    void load();
+  }
+
   return {
     items,
     total,
@@ -84,5 +85,6 @@ export const useSalesOrdersStore = defineStore('salesOrders', () => {
     setCity,
     setPage,
     invalidate,
+    reload,
   };
 });
