@@ -2,6 +2,7 @@
 import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import AddLinesDialog from '../components/AddLinesDialog.vue';
 import AsyncState from '../components/AsyncState.vue';
 import CapacityGauge from '../components/CapacityGauge.vue';
@@ -21,8 +22,13 @@ const store = useTransportOrdersStore();
 const userStore = useUserStore();
 const toast = useToast();
 const confirm = useConfirm();
+const router = useRouter();
 
 const addLinesDialogVisible = ref(false);
+
+function goToList(): void {
+  void router.push({ name: 'transport-orders' });
+}
 
 onMounted(() => {
   void store.loadDetail(props.no);
@@ -88,6 +94,14 @@ function onLinesAdded(): void {
 <template>
   <div class="order-detail">
     <header class="page-header">
+      <Button
+        icon="pi pi-arrow-left"
+        text
+        rounded
+        aria-label="Retour aux ordres de transport"
+        class="page-header__back"
+        @click="goToList"
+      />
       <div class="page-header__icon"><i class="pi pi-file" /></div>
       <div>
         <h2>Ordre {{ no }}</h2>
@@ -210,6 +224,11 @@ function onLinesAdded(): void {
   display: flex;
   align-items: flex-start;
   gap: 0.9rem;
+}
+
+.page-header__back {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .page-header__icon {
