@@ -312,4 +312,43 @@ describeWithDb('Scénarios section 8 (e2e)', () => {
       expect(await salesOrderStatus('SO-1008')).toBe(1);
     });
   });
+
+  describe('Contrôle de concurrence optimiste (If-Match)', () => {
+    // beforeAll suffit : chaque test crée son propre ordre, aucun partage d'état entre eux.
+    beforeAll(() => resetDatabase());
+
+    it('accepte la mutation quand If-Match correspond à la version actuelle', async () => {
+      const created = await request(app.getHttpServer())
+        .post('/transport-orders')
+        .set('X-User-Id', 'diane')
+        .send({ vehicleCode: 'VH-09', deliveryDate: TOMORROW })
+        .expect(201);
+
+      const version: string = created.body.version;
+      expect(version).toMatch(/^0x[0-9a-fA-F]+$/);
+
+      await request(app.getHttpServer())
+        .post(`/transport-orders/${created.body.no}/lines`)
+        .set('X-User-Id', 'diane')
+        .set('If-Match', version)
+        .send({ salesOrderNos: ['SO-1009'] })
+        .expect(200);
+    });
+
+    it('refuse la mutation avec un If-Match périmé -> 412 STALE_VERSION', async () => {
+      const created = await request(app.getHttpServer())
+        .post('/transport-orders')
+        .set('X-User-Id', 'diane')
+        .send({ vehicleCode: 'VH-10', deliveryDate: TOMORROW })
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .post(`/transport-orders/${created.body.no}/lines`)
+        .set('X-User-Id', 'diane')
+        .set('If-Match', '0x0000000000000000')
+        .send({ salesOrderNos: ['SO-1011'] })
+        .expect(412);
+      expect(response.body.code).toBe('STALE_VERSION');
+    });
+  });
 });
