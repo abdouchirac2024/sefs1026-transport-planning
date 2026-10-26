@@ -274,7 +274,22 @@ temps :
 
 ## Temps réellement passé
 
-<À COMPLÉTER par le candidat>
+Environ **4 h 20 de travail effectif**, réparties sur deux jours :
+
+| Étape | Durée |
+|---|---|
+| Lecture du sujet, analyse de la base, choix d'architecture, socle API et front | 30 min |
+| Authentification simulée, format d'erreur, règles métier pures et tests unitaires | 15 min |
+| Lectures et mutations transactionnelles | 25 min |
+| Front Vue 3 (3 écrans) | 25 min |
+| README, décisions, Swagger, tests e2e | 45 min |
+| Vérification réelle sur la base, corrections des 4 bugs, tests manuels | 2 h |
+
+Le téléchargement de l'image SQL Server a pris environ 1 h 40 à cause d'un débit réseau
+faible. Ce temps n'est pas compté : j'ai avancé en parallèle sur ce qui ne dépendait pas
+de la base (règles, tests unitaires, front, documentation), puis tout vérifié une fois la
+base disponible.
+
 
 ## Utilisation d'outils d'IA
 
