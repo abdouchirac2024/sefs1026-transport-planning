@@ -44,6 +44,7 @@ async function confirm(): Promise<void> {
   }
   try {
     await transportOrdersStore.addLinesToCurrent(selected.value.map((so) => so.no));
+    salesOrdersStore.invalidate();
     emit('success');
     emit('update:visible', false);
   } catch {
@@ -69,7 +70,7 @@ function close(): void {
       :error="salesOrdersStore.error"
       :empty="!salesOrdersStore.loading && !salesOrdersStore.error && salesOrdersStore.items.length === 0"
       empty-message="Aucune commande à planifier disponible."
-      @retry="salesOrdersStore.load"
+      @retry="() => salesOrdersStore.load(true)"
     >
       <DataTable
         :value="salesOrdersStore.items"

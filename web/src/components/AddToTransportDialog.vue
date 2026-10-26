@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { toApiError, type ApiError } from '../api/http-client';
 import { addLines, createTransportOrder, fetchTransportOrders } from '../api/transport-orders';
 import type { SalesOrderToPlan, TransportOrderListItem } from '../domain/types';
+import { useTransportOrdersStore } from '../stores/transport-orders';
 import { useVehiclesStore } from '../stores/vehicles';
 
 import Button from 'primevue/button';
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 }>();
 
 const vehiclesStore = useVehiclesStore();
+const transportOrdersStore = useTransportOrdersStore();
 
 type Mode = 'existing' | 'new';
 const mode = ref<Mode>('existing');
@@ -133,6 +135,7 @@ async function handleConfirm(): Promise<void> {
 
     const salesOrderNos = props.selectedOrders.map((so) => so.no);
     await addLines(no, salesOrderNos, version);
+    transportOrdersStore.invalidate();
 
     emit('success', no);
     emit('update:visible', false);

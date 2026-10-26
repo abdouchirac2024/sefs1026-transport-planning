@@ -49,7 +49,7 @@ function onRowClick(event: DataTableRowClickEvent): void {
 
 function onCreated(no: string): void {
   toast.add({ severity: 'success', summary: 'Ordre créé', detail: `Ordre ${no} créé.`, life: 4000 });
-  void store.load();
+  void store.load(true);
   void router.push({ name: 'transport-order-detail', params: { no } });
 }
 </script>
@@ -77,7 +77,7 @@ function onCreated(no: string): void {
       :error="store.error"
       :empty="!store.loading && !store.error && store.items.length === 0"
       empty-message="Aucun ordre de transport pour ces filtres."
-      @retry="store.load"
+      @retry="() => store.load(true)"
     >
       <DataTable
         :value="store.items"

@@ -44,7 +44,7 @@ function onSuccess(transportOrderNo: string): void {
     life: 4000,
   });
   selectedOrders.value = [];
-  void store.load();
+  void store.load(true);
 }
 
 function selectedWeightKg(): number {
@@ -96,7 +96,7 @@ function selectedWeightKg(): number {
       :error="store.error"
       :empty="!store.loading && !store.error && store.items.length === 0"
       empty-message="Aucune commande à planifier pour le moment."
-      @retry="store.load"
+      @retry="() => store.load(true)"
     >
       <section class="table-card">
         <div class="table-scroll">

@@ -22,8 +22,13 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
   const date = ref<string | undefined>(undefined);
   const loading = ref(false);
   const error = ref<ApiError | null>(null);
+  let loaded = false;
 
-  async function load(): Promise<void> {
+  /** `force` contourne le cache : utilisé après un changement de filtre/page ou une mutation qui invalide la liste. */
+  async function load(force = false): Promise<void> {
+    if (loaded && !force) {
+      return;
+    }
     loading.value = true;
     error.value = null;
     try {
@@ -35,6 +40,7 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
       });
       items.value = result.items;
       total.value = result.total;
+      loaded = true;
     } catch (e) {
       error.value = toApiError(e);
     } finally {
@@ -45,18 +51,24 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
   function setStatus(value: number | undefined): void {
     status.value = value;
     page.value = 1;
-    void load();
+    void load(true);
   }
 
   function setDate(value: string | undefined): void {
     date.value = value;
     page.value = 1;
-    void load();
+    void load(true);
   }
 
   function setPage(value: number): void {
     page.value = value;
-    void load();
+    void load(true);
+  }
+
+  /** Marque la liste comme périmée sans la recharger : à utiliser quand une mutation change un
+   * ordre (statut, lignes) ou en crée un nouveau par un chemin qui ne repasse pas par `load()`. */
+  function invalidate(): void {
+    loaded = false;
   }
 
   // --- Détail + mutations ---
@@ -85,6 +97,7 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
     mutationError.value = null;
     try {
       current.value = await action();
+      invalidate();
     } catch (e) {
       mutationError.value = toApiError(e);
       throw e;
@@ -144,6 +157,7 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
     setStatus,
     setDate,
     setPage,
+    invalidate,
     current,
     detailLoading,
     detailError,
