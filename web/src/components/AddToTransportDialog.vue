@@ -59,6 +59,18 @@ const wouldExceedCapacity = computed(
   () => remainingCapacityKg.value !== null && selectedWeightKg.value > remainingCapacityKg.value,
 );
 
+/** Pourcentage de la capacité restante que la sélection consommerait, plafonné à 100 pour l'affichage de la barre. */
+const capacityPreviewPercent = computed(() => {
+  if (!remainingCapacityKg.value || remainingCapacityKg.value <= 0) {
+    return selectedWeightKg.value > 0 ? 100 : 0;
+  }
+  return Math.min(100, (selectedWeightKg.value / remainingCapacityKg.value) * 100);
+});
+
+const overflowKg = computed(() =>
+  remainingCapacityKg.value !== null ? selectedWeightKg.value - remainingCapacityKg.value : 0,
+);
+
 const canSubmit = computed(() => {
   if (props.selectedOrders.length === 0 || submitting.value) {
     return false;
@@ -189,11 +201,24 @@ function close(): void {
       <input v-model="deliveryDate" type="date" :min="todayIso" class="date-input" />
     </div>
 
-    <p v-if="remainingCapacityKg !== null" :class="{ warning: wouldExceedCapacity }">
-      Poids sélectionné {{ selectedWeightKg.toFixed(2) }} kg / capacité restante
-      {{ remainingCapacityKg.toFixed(2) }} kg
-      <span v-if="wouldExceedCapacity">— dépassement probable, l'API refusera l'ajout.</span>
-    </p>
+    <div v-if="remainingCapacityKg !== null" class="capacity-preview" :class="{ 'capacity-preview--danger': wouldExceedCapacity }">
+      <div class="capacity-preview__row">
+        <span class="capacity-preview__label">
+          <i class="pi" :class="wouldExceedCapacity ? 'pi-exclamation-triangle' : 'pi-check-circle'" />
+          {{ wouldExceedCapacity ? 'Capacité insuffisante' : 'Tient dans la capacité restante' }}
+        </span>
+        <span class="capacity-preview__values">
+          {{ selectedWeightKg.toFixed(2) }} / {{ remainingCapacityKg.toFixed(2) }} kg
+        </span>
+      </div>
+      <div class="capacity-preview__bar">
+        <div class="capacity-preview__fill" :style="{ width: capacityPreviewPercent + '%' }" />
+      </div>
+      <p v-if="wouldExceedCapacity" class="capacity-preview__hint">
+        Dépasse la capacité restante de <strong>{{ overflowKg.toFixed(2) }} kg</strong> — l'API refusera l'ajout tant
+        que la sélection n'est pas réduite ou qu'un véhicule plus grand n'est pas choisi.
+      </p>
+    </div>
 
     <Message v-if="submitError" severity="error" :closable="false">{{ submitError.message }}</Message>
 
@@ -238,7 +263,67 @@ function close(): void {
   padding: 1rem;
 }
 
-.warning {
-  color: var(--p-orange-500, #f59e0b);
+.capacity-preview {
+  margin: 1rem 0;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: var(--p-green-50, #f0fdf4);
+  border: 1px solid var(--p-green-200, #bbf7d0);
+}
+
+.capacity-preview--danger {
+  background: var(--p-red-50, #fef2f2);
+  border-color: var(--p-red-200, #fecaca);
+}
+
+.capacity-preview__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.capacity-preview__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--p-green-700, #15803d);
+}
+
+.capacity-preview--danger .capacity-preview__label {
+  color: var(--p-red-700, #b91c1c);
+}
+
+.capacity-preview__values {
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-text-muted-color);
+}
+
+.capacity-preview__bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--p-surface-200, #e5e7eb);
+  overflow: hidden;
+}
+
+.capacity-preview__fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--p-green-500, #22c55e);
+  transition: width 0.25s ease;
+}
+
+.capacity-preview--danger .capacity-preview__fill {
+  background: var(--p-red-500, #ef4444);
+}
+
+.capacity-preview__hint {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: var(--p-red-700, #b91c1c);
 }
 </style>
