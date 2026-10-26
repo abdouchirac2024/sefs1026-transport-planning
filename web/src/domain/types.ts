@@ -24,7 +24,6 @@ export interface SalesOrderToPlan {
   status: SalesOrderStatus;
 }
 
-/** Statut d'un ordre de transport : 0 = Brouillon, 1 = Validé, 2 = Parti. */
 export type TransportOrderStatus = 0 | 1 | 2;
 
 export interface TransportOrderListItem {
