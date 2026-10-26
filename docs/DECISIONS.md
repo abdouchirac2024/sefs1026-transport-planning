@@ -67,6 +67,29 @@ exige `@nestjs/common@^12.0.0`, incompatible avec le NestJS 10 utilisé dans ce 
 est la dernière version de la branche 7.x compatible avec Nest 10, sans forcer une montée de
 version de tout le framework pour un bonus.
 
+## Conversion du rowversion en hexadécimal (bug trouvé à la vérification)
+
+**Piège** : `CONVERT(varchar(18), [timestamp], 1)` ne produit **pas** une chaîne hexadécimale en
+SQL Server. Les styles de `CONVERT` (0/1/2) qui ajoutent ou non le préfixe `0x` ne s'appliquent
+que dans le sens caractère→binaire (interpréter une chaîne de chiffres hex comme des octets).
+Dans l'autre sens (binaire→caractère, notre cas avec `rowversion`), SQL Server réinterprète
+simplement chaque octet brut comme un caractère : un `rowversion` de 8 octets devient une chaîne
+de 8 caractères, pouvant contenir des octets nuls (`\x00`) ou tout autre octet non imprimable.
+
+**Conséquence concrète** : le champ `version` renvoyé par l'API contenait ces octets bruts. Une
+fois replacés dans l'en-tête `If-Match` d'une requête suivante (flux normal : créer un ordre →
+ajouter des lignes), le navigateur (`fetch()`) refusait silencieusement d'envoyer un en-tête
+contenant un octet nul -- notre client HTTP affichait alors "Impossible de contacter le serveur",
+un message trompeur qui ressemblait à une vraie panne réseau.
+
+**Décision** : utiliser `master.dbo.fn_varbintohexstr([timestamp])`, la fonction système conçue
+pour cet usage, qui produit bien `0x00000000000007d1` (18 caractères, valide en en-tête HTTP).
+
+**Pourquoi ça n'a pas été détecté par les tests automatisés** : aucun test (unitaire ou e2e)
+n'exerçait le chemin `If-Match` (capturer une `version` puis la renvoyer) -- seul le test manuel
+dans le navigateur l'a révélé. 2 tests e2e ont été ajoutés après coup pour combler ce trou
+(succès avec la bonne version, `412 STALE_VERSION` avec une version volontairement fausse).
+
 ## Configuration partagée entre main.ts et les tests e2e (bug trouvé à la vérification)
 
 **Constat** : lors de la première exécution des tests e2e contre une vraie base, 20 des 24

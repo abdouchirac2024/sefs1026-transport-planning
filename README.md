@@ -75,7 +75,7 @@ npm run build                 # vérifie aussi le typage (vue-tsc)
 ```
 
 Sans `E2E_DB=true`, les tests e2e API sont ignorés (`describe.skip`) pour que
-`npm run test:e2e` reste vert même sans base disponible (confirmé : 24 tests skip, exit
+`npm run test:e2e` reste vert même sans base disponible (confirmé : 26 tests skip, exit
 code 0). `test/section8-scenarios.e2e-spec.ts` couvre tous les scénarios de la section 8 du
 skill (lectures, création, capacité, tout-ou-rien, rôles, transitions de statut, et le cas de
 concurrence — deux ajouts simultanés de la même commande dans deux ordres), regroupés en 6
@@ -84,7 +84,8 @@ concurrence — deux ajouts simultanés de la même commande dans deux ordres), 
 aucun test ne dépend de l'effet d'un autre — chacun peut être lancé seul.
 
 **Vérifié contre une vraie instance SQL Server** (voir "Vérification contre la vraie base") :
-24/24 tests e2e passent, 79/79 tests unitaires API, 11/11 tests unitaires front.
+26/26 tests e2e passent (21 scénarios de la section 8 + 2 tests If-Match + 3 tests auth/vehicles
+de base), 79/79 tests unitaires API, 11/11 tests unitaires front.
 
 ### Utilisateurs de test
 
@@ -127,7 +128,7 @@ section 8 passent**, Swagger se charge correctement, le front fonctionne.
 | 20 | Départ TO-0001 (déjà parti) | 409 `INVALID_STATUS_TRANSITION` | ✅ |
 | 21 | Deux ajouts concurrents de SO-1008 | un seul réussit (200/409) | ✅ |
 
-### Bugs trouvés et corrigés (2, chacun avec un commit `fix(api): ...` séparé)
+### Bugs trouvés et corrigés (3, chacun avec un commit `fix(api): ...` séparé)
 
 1. **Les tests e2e ne configuraient pas `ValidationPipe`/`DomainErrorFilter`** comme `main.ts`
    le fait. `Test.createTestingModule().createNestApplication()` ne rejoue pas le `bootstrap()`
@@ -140,11 +141,24 @@ section 8 passent**, Swagger se charge correctement, le front fonctionne.
    par défaut à toute route `@Post()` sans `@HttpCode` explicite). Corrigé en ajoutant
    `@HttpCode(HttpStatus.OK)` sur les trois routes. *Celui-ci affectait bien le serveur réel —
    un vrai bug métier, pas un artefact de test.*
+3. **`CONVERT(varchar(18), [timestamp], 1)` ne produit pas une chaîne hexadécimale** en SQL
+   Server (le style de conversion ne s'applique pas dans ce sens binaire→caractère) : il
+   réinterprète simplement les 8 octets bruts du `rowversion` comme des caractères, dont des
+   octets nuls (`\x00`). Le champ `version` renvoyé par l'API contenait donc des octets
+   invalides. Une fois replacés dans l'en-tête `If-Match` d'une requête suivante (flux normal
+   du front : créer un ordre → ajouter des lignes), `fetch()` refusait silencieusement d'envoyer
+   un en-tête avec un octet nul, ce que notre client HTTP affichait à tort comme "Impossible de
+   contacter le serveur". **Trouvé uniquement via le test manuel dans le navigateur** — aucun
+   test automatisé n'exerçait le chemin `If-Match` (capturer une version puis la renvoyer).
+   Corrigé avec `master.dbo.fn_varbintohexstr([timestamp])`, la fonction système correcte, et
+   2 tests e2e ajoutés pour combler ce trou de couverture. *Affectait bien le serveur réel dès
+   qu'un client respectait `If-Match`.*
 
 Aucun des risques identifiés à l'avance (combinaison `GROUP BY` + `COUNT(*) OVER()` +
 `OFFSET/FETCH`, syntaxe `sp_getapplock`, `OPENJSON`, noms de colonnes entre crochets) ne s'est
 révélé être un problème : le SQL écrit en suivant la documentation était correct du premier
-coup.
+coup. Les 3 bugs réels trouvés portaient tous sur des détails plus subtils (configuration du
+bootstrap de test, code HTTP par défaut de NestJS, sens de conversion `CONVERT`).
 
 ## Choix techniques et pourquoi
 
