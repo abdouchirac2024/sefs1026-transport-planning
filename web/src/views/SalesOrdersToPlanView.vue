@@ -146,7 +146,6 @@ function selectedWeightKg(): number {
   gap: 1.25rem;
 }
 
-/* --- En-tête de page --- */
 .page-header {
   display: flex;
   align-items: flex-start;
@@ -177,7 +176,6 @@ function selectedWeightKg(): number {
   font-size: 0.9rem;
 }
 
-/* --- Barre d'outils --- */
 .toolbar-card {
   display: flex;
   align-items: center;
@@ -227,7 +225,6 @@ function selectedWeightKg(): number {
   white-space: nowrap;
 }
 
-/* --- Tableau --- */
 .table-card {
   background: var(--p-content-background, #fff);
   border: 1px solid var(--p-content-border-color);
@@ -265,7 +262,6 @@ function selectedWeightKg(): number {
   font-variant-numeric: tabular-nums;
 }
 
-/* --- Responsive --- */
 @media (max-width: 640px) {
   .toolbar-card {
     flex-direction: column;

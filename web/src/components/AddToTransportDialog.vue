@@ -59,7 +59,6 @@ const wouldExceedCapacity = computed(
   () => remainingCapacityKg.value !== null && selectedWeightKg.value > remainingCapacityKg.value,
 );
 
-/** Pourcentage de la capacité restante que la sélection consommerait, plafonné à 100 pour l'affichage de la barre. */
 const capacityPreviewPercent = computed(() => {
   if (!remainingCapacityKg.value || remainingCapacityKg.value <= 0) {
     return selectedWeightKg.value > 0 ? 100 : 0;

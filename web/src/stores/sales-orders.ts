@@ -17,7 +17,6 @@ export const useSalesOrdersStore = defineStore('salesOrders', () => {
   const cities = ref<string[]>([]);
   let citiesLoaded = false;
 
-  /** `force` contourne le cache : utilisé après un changement de filtre/page ou une mutation qui invalide la liste. */
   async function load(force = false): Promise<void> {
     if (loaded && !force) {
       return;
@@ -44,7 +43,6 @@ export const useSalesOrdersStore = defineStore('salesOrders', () => {
       cities.value = await fetchCities();
       citiesLoaded = true;
     } catch {
-      // Le filtre ville reste vide si l'appel échoue : non bloquant pour l'écran, on retentera au prochain appel.
     }
   }
 
@@ -59,9 +57,6 @@ export const useSalesOrdersStore = defineStore('salesOrders', () => {
     void load(true);
   }
 
-  /** Marque la liste comme périmée sans la recharger : à utiliser quand une mutation faite ailleurs
-   * (ex. ajout de commandes à un ordre depuis l'écran de détail) rend les données actuellement en
-   * cache obsolètes. Le prochain `load()` ira rechercher les données à jour. */
   function invalidate(): void {
     loaded = false;
   }

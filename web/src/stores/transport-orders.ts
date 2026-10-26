@@ -13,7 +13,6 @@ import {
 import type { TransportOrderDetail, TransportOrderListItem } from '../domain/types';
 
 export const useTransportOrdersStore = defineStore('transportOrders', () => {
-  // --- Liste ---
   const items = ref<TransportOrderListItem[]>([]);
   const total = ref(0);
   const page = ref(1);
@@ -24,7 +23,6 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
   const error = ref<ApiError | null>(null);
   let loaded = false;
 
-  /** `force` contourne le cache : utilisé après un changement de filtre/page ou une mutation qui invalide la liste. */
   async function load(force = false): Promise<void> {
     if (loaded && !force) {
       return;
@@ -65,7 +63,6 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
     void load(true);
   }
 
-  // --- Ordres Brouillon (sélecteur du dialogue "Ajouter à un transport") ---
   const draftOrders = ref<TransportOrderListItem[]>([]);
   const draftOrdersLoading = ref(false);
   const draftOrdersError = ref<ApiError | null>(null);
@@ -88,15 +85,11 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
     }
   }
 
-  /** Marque les listes (principale + ordres Brouillon) comme périmées sans les recharger : à
-   * utiliser quand une mutation change un ordre (statut, lignes) ou en crée un nouveau par un
-   * chemin qui ne repasse pas par `load()`. Le prochain accès ira rechercher les données à jour. */
   function invalidate(): void {
     loaded = false;
     draftOrdersLoaded = false;
   }
 
-  // --- Détail + mutations ---
   const current = ref<TransportOrderDetail | null>(null);
   const detailLoading = ref(false);
   const detailError = ref<ApiError | null>(null);
@@ -116,7 +109,6 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
     }
   }
 
-  /** Enveloppe commune aux mutations sur `current` : état mutating/mutationError, remplace `current` par la réponse. */
   async function runMutation(action: () => Promise<TransportOrderDetail>): Promise<void> {
     mutating.value = true;
     mutationError.value = null;
