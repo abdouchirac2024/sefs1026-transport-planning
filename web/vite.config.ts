@@ -10,7 +10,7 @@ export default defineConfig({
     globals: false,
     coverage: {
       provider: 'v8',
-      include: ['src/domain/**/*.ts'],
+      include: ['src/domain/**/*.ts', 'src/stores/**/*.ts'],
     },
   },
 });
