@@ -12,13 +12,22 @@ export const useSalesOrdersStore = defineStore('salesOrders', () => {
   const city = ref<string | undefined>(undefined);
   const loading = ref(false);
   const error = ref<ApiError | null>(null);
-  let loaded = false;
 
   const cities = ref<string[]>([]);
   let citiesLoaded = false;
 
-  async function load(force = false): Promise<void> {
-    if (loaded && !force) {
+  const pageCache = new Map<number, { items: SalesOrderToPlan[]; total: number }>();
+  let cachedCity: string | undefined;
+
+  async function load(): Promise<void> {
+    if (cachedCity !== city.value) {
+      pageCache.clear();
+      cachedCity = city.value;
+    }
+    const cached = pageCache.get(page.value);
+    if (cached) {
+      items.value = cached.items;
+      total.value = cached.total;
       return;
     }
     loading.value = true;
@@ -27,7 +36,7 @@ export const useSalesOrdersStore = defineStore('salesOrders', () => {
       const result = await fetchSalesOrdersToPlan({ city: city.value, page: page.value, pageSize: pageSize.value });
       items.value = result.items;
       total.value = result.total;
-      loaded = true;
+      pageCache.set(page.value, { items: result.items, total: result.total });
     } catch (e) {
       error.value = toApiError(e);
     } finally {
@@ -49,16 +58,16 @@ export const useSalesOrdersStore = defineStore('salesOrders', () => {
   function setCity(value: string | undefined): void {
     city.value = value;
     page.value = 1;
-    void load(true);
+    void load();
   }
 
   function setPage(value: number): void {
     page.value = value;
-    void load(true);
+    void load();
   }
 
   function invalidate(): void {
-    loaded = false;
+    pageCache.clear();
   }
 
   return {

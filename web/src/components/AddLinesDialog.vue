@@ -55,6 +55,11 @@ async function confirm(): Promise<void> {
 function close(): void {
   emit('update:visible', false);
 }
+
+function retryLoad(): void {
+  salesOrdersStore.invalidate();
+  void salesOrdersStore.load();
+}
 </script>
 
 <template>
@@ -70,7 +75,7 @@ function close(): void {
       :error="salesOrdersStore.error"
       :empty="!salesOrdersStore.loading && !salesOrdersStore.error && salesOrdersStore.items.length === 0"
       empty-message="Aucune commande à planifier disponible."
-      @retry="() => salesOrdersStore.load(true)"
+      @retry="retryLoad"
     >
       <DataTable
         :value="salesOrdersStore.items"

@@ -21,10 +21,24 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
   const date = ref<string | undefined>(undefined);
   const loading = ref(false);
   const error = ref<ApiError | null>(null);
-  let loaded = false;
 
-  async function load(force = false): Promise<void> {
-    if (loaded && !force) {
+  const pageCache = new Map<number, { items: TransportOrderListItem[]; total: number }>();
+  let cachedFilterKey: string | undefined;
+
+  function filterKey(): string {
+    return `${status.value ?? ''}|${date.value ?? ''}`;
+  }
+
+  async function load(): Promise<void> {
+    const key = filterKey();
+    if (cachedFilterKey !== key) {
+      pageCache.clear();
+      cachedFilterKey = key;
+    }
+    const cached = pageCache.get(page.value);
+    if (cached) {
+      items.value = cached.items;
+      total.value = cached.total;
       return;
     }
     loading.value = true;
@@ -38,7 +52,7 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
       });
       items.value = result.items;
       total.value = result.total;
-      loaded = true;
+      pageCache.set(page.value, { items: result.items, total: result.total });
     } catch (e) {
       error.value = toApiError(e);
     } finally {
@@ -49,18 +63,18 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
   function setStatus(value: number | undefined): void {
     status.value = value;
     page.value = 1;
-    void load(true);
+    void load();
   }
 
   function setDate(value: string | undefined): void {
     date.value = value;
     page.value = 1;
-    void load(true);
+    void load();
   }
 
   function setPage(value: number): void {
     page.value = value;
-    void load(true);
+    void load();
   }
 
   const draftOrders = ref<TransportOrderListItem[]>([]);
@@ -86,7 +100,7 @@ export const useTransportOrdersStore = defineStore('transportOrders', () => {
   }
 
   function invalidate(): void {
-    loaded = false;
+    pageCache.clear();
     draftOrdersLoaded = false;
   }
 
