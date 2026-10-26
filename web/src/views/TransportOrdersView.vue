@@ -42,9 +42,12 @@ function onDateChange(event: Event): void {
   store.setDate(value === '' ? undefined : value);
 }
 
-function onRowClick(event: DataTableRowClickEvent): void {
-  const no = (event.data as { no: string }).no;
+function goToDetail(no: string): void {
   void router.push({ name: 'transport-order-detail', params: { no } });
+}
+
+function onRowClick(event: DataTableRowClickEvent): void {
+  goToDetail((event.data as { no: string }).no);
 }
 
 function onCreated(no: string): void {
@@ -105,6 +108,17 @@ function onCreated(no: string): void {
         <Column header="Remplissage">
           <template #body="slotProps">
             {{ slotProps.data.totalWeightKg.toFixed(2) }} / {{ slotProps.data.capacityKg.toFixed(2) }} kg
+          </template>
+        </Column>
+        <Column header-style="width: 4rem">
+          <template #body="slotProps">
+            <Button
+              icon="pi pi-arrow-right"
+              text
+              rounded
+              aria-label="Voir le détail"
+              @click.stop="goToDetail(slotProps.data.no)"
+            />
           </template>
         </Column>
       </DataTable>
