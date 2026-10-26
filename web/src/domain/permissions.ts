@@ -1,10 +1,5 @@
 import type { Role, TransportOrderStatus } from './types';
 
-/**
- * Fonctions pures : décident quels boutons afficher/activer selon le rôle et le statut.
- * Purement indicatif côté front -- l'API revérifie tout, quoi qu'il arrive ici.
- */
-
 const DRAFT: TransportOrderStatus = 0;
 const VALIDATED: TransportOrderStatus = 1;
 

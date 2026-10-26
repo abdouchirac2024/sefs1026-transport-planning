@@ -10,7 +10,6 @@ const percentage = computed(() => {
   return Math.min(100, (props.totalWeightKg / props.capacityKg) * 100);
 });
 
-// Seuils demandés : vert < 80 %, orange < 100 %, rouge = 100 % (ou au-delà, par sécurité d'affichage).
 const severity = computed(() => {
   if (percentage.value >= 100) {
     return 'danger';

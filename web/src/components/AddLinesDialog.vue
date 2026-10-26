@@ -48,7 +48,6 @@ async function confirm(): Promise<void> {
     emit('success');
     emit('update:visible', false);
   } catch {
-    // Erreur déjà exposée via transportOrdersStore.mutationError, affichée ci-dessous.
   }
 }
 

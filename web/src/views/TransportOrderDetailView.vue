@@ -41,7 +41,6 @@ async function removeLine(salesOrderNo: string): Promise<void> {
     await store.removeLineFromCurrent(salesOrderNo);
     toast.add({ severity: 'success', summary: 'Commande retirée', detail: salesOrderNo, life: 3000 });
   } catch {
-    // Erreur déjà affichée via store.mutationError.
   }
 }
 
