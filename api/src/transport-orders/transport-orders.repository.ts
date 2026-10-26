@@ -41,7 +41,7 @@ export class TransportOrdersRepository {
                t.[Status]                             AS status,
                t.[Created By]                         AS createdBy,
                t.[Validated By]                       AS validatedBy,
-               CONVERT(varchar(18), t.[timestamp], 1)  AS version,
+               master.dbo.fn_varbintohexstr(t.[timestamp]) AS version,
                ISNULL(SUM(so.[Total Weight (kg)]), 0) AS totalWeightKg,
                COUNT(l.[Sales Order No_])             AS lineCount,
                COUNT(*) OVER()                        AS totalCount
@@ -93,7 +93,7 @@ export class TransportOrdersRepository {
                t.[Status]                             AS status,
                t.[Created By]                         AS createdBy,
                t.[Validated By]                       AS validatedBy,
-               CONVERT(varchar(18), t.[timestamp], 1)  AS version
+               master.dbo.fn_varbintohexstr(t.[timestamp]) AS version
         FROM [Transport Order] t
         JOIN [Vehicle] v ON v.[Code] = t.[Vehicle Code]
         WHERE t.[No_] = @no
@@ -197,7 +197,7 @@ export class TransportOrdersRepository {
       version: string;
     }>(`
         SELECT [Status]                             AS status,
-               CONVERT(varchar(18), [timestamp], 1)  AS version
+               master.dbo.fn_varbintohexstr([timestamp]) AS version
         FROM [Transport Order] WITH (UPDLOCK, ROWLOCK)
         WHERE [No_] = @no
       `);
