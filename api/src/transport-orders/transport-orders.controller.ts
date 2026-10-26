@@ -28,7 +28,6 @@ import { TransportOrdersQueryDto } from './dto/transport-orders-query.dto';
 import { TransportOrdersRepository } from './transport-orders.repository';
 import { TransportOrdersService } from './transport-orders.service';
 
-/** Documente l'en-tête optionnel de concurrence optimiste, commun aux mutations après création. */
 const IF_MATCH_HEADER = ApiHeader({
   name: 'If-Match',
   description:

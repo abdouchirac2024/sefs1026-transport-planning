@@ -4,11 +4,6 @@ import * as request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { configureApp } from './../src/configure-app';
 
-/**
- * Test e2e nécessitant SQL Server démarré (docker compose up -d, init.sql exécuté).
- * Ignoré par défaut pour que `npm run test:e2e` reste vert sans base disponible :
- * lancer avec `E2E_DB=true npm run test:e2e` une fois la base prête (voir README).
- */
 const describeWithDb = process.env.E2E_DB === 'true' ? describe : describe.skip;
 
 describeWithDb('GET /vehicles (e2e)', () => {

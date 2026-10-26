@@ -6,7 +6,6 @@ import { VehicleDto } from './dto/vehicle.dto';
 export class VehiclesRepository {
   constructor(private readonly db: DatabaseService) {}
 
-  /** Véhicules actifs, triés par code. */
   async findActive(): Promise<VehicleDto[]> {
     const result = await this.db.request().query<VehicleDto>(`
       SELECT [Code]          AS code,
@@ -20,10 +19,6 @@ export class VehiclesRepository {
     return result.recordset;
   }
 
-  /**
-   * Un véhicule par son code, actif ou non (utile pour vérifier VEHICLE_INACTIVE).
-   * `tx` optionnel : exécute la requête dans une transaction déjà ouverte si fourni.
-   */
   async findByCode(
     code: string,
     tx?: sql.Transaction,

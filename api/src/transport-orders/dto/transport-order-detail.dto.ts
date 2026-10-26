@@ -5,7 +5,6 @@ export interface TransportOrderLineDto {
   totalWeightKg: number;
 }
 
-/** Ligne brute d'en-tête (véhicule + ordre), avant assemblage avec les lignes de commandes. */
 export interface TransportOrderHeaderRow {
   no: string;
   vehicleCode: string;

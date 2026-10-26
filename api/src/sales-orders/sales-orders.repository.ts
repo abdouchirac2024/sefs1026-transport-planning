@@ -12,7 +12,6 @@ interface SalesOrderToPlanRow extends SalesOrderToPlanDto {
 export class SalesOrdersRepository {
   constructor(private readonly db: DatabaseService) {}
 
-  /** Commandes au statut "À planifier" (0), filtrables par ville exacte, paginées. */
   async findToPlan(query: ToPlanQueryDto): Promise<Page<SalesOrderToPlanDto>> {
     const offset = toOffset(query.page, query.pageSize);
 
@@ -48,7 +47,6 @@ export class SalesOrdersRepository {
     return { items, total, page: query.page, pageSize: query.pageSize };
   }
 
-  /** Villes distinctes parmi les commandes "À planifier", pour peupler le filtre du front. */
   async findCities(): Promise<string[]> {
     const result = await this.db.request().query<{ city: string }>(`
       SELECT DISTINCT [Delivery City] AS city
@@ -59,12 +57,6 @@ export class SalesOrdersRepository {
     return result.recordset.map((row) => row.city);
   }
 
-  /**
-   * Commandes demandées qui existent réellement en base, verrouillées pour la durée de la
-   * transaction (WITH UPDLOCK, ROWLOCK) : sérialise les tentatives d'affectation concurrentes
-   * sur les mêmes commandes. Celles absentes de `requestedNos` par rapport au résultat sont
-   * considérées introuvables par assertPlannable.
-   */
   async findByNosForUpdate(
     requestedNos: string[],
     tx: sql.Transaction,
@@ -85,11 +77,6 @@ export class SalesOrdersRepository {
     return result.recordset;
   }
 
-  /**
-   * Passe les commandes données au statut Planifiée (1), uniquement celles encore À planifier (0).
-   * Renvoie le nombre de lignes effectivement mises à jour : si inférieur au nombre demandé,
-   * une affectation concurrente a eu lieu entre la vérification et cette écriture (garde-fou).
-   */
   async markPlanned(
     salesOrderNos: string[],
     tx: sql.Transaction,
@@ -106,7 +93,6 @@ export class SalesOrdersRepository {
     return result.rowsAffected[0];
   }
 
-  /** Repasse une commande au statut À planifier (0), suite au retrait d'une ligne. */
   async markToPlan(salesOrderNo: string, tx: sql.Transaction): Promise<void> {
     await this.db.requestIn(tx).input('no', sql.NVarChar(20), salesOrderNo)
       .query(`

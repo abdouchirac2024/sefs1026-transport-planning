@@ -4,11 +4,6 @@ import {
   TransportOrderLineDto,
 } from '../dto/transport-order-detail.dto';
 
-/**
- * Assemble l'en-tête (ordre + véhicule) et les lignes (commandes) en un seul DTO,
- * en calculant le poids total et la capacité restante. Fonction pure : aucune I/O,
- * testable sans base de données.
- */
 export function toTransportOrderDetailDto(
   header: TransportOrderHeaderRow,
   lines: TransportOrderLineDto[],

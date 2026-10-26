@@ -17,11 +17,6 @@ interface ErrorResponseBody {
   details?: Record<string, unknown>;
 }
 
-/**
- * Transforme toute exception (DomainError, erreurs Nest, erreurs inattendues)
- * en un format de réponse unique : { statusCode, code, message, details? }.
- * Le "code" est stable dans le temps : le front s'appuie dessus, pas sur "message".
- */
 @Catch()
 export class DomainErrorFilter implements ExceptionFilter {
   private readonly logger = new Logger(DomainErrorFilter.name);

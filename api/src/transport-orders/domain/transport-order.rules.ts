@@ -3,12 +3,6 @@ import { DomainError } from '../../common/errors/domain-error';
 import { ErrorCode } from '../../common/errors/error-codes';
 import { Role } from '../../auth/role.enum';
 
-/**
- * Fonctions pures : aucune I/O, aucun accès base de données. Elles reçoivent un instantané
- * des données déjà chargées par le service (sous verrou) et lèvent une DomainError si une
- * règle métier est violée. Testables sans NestJS ni SQL Server.
- */
-
 export enum SalesOrderStatus {
   TO_PLAN = 0,
   PLANNED = 1,
@@ -30,12 +24,10 @@ export interface SalesOrderSnapshot {
   status: SalesOrderStatus;
 }
 
-/** Compare les poids en centièmes entiers pour éviter les erreurs d'arrondi des nombres flottants. */
 function toCents(kg: number): number {
   return Math.round(kg * 100);
 }
 
-/** Règle 1 : création au statut Brouillon, véhicule actif, date non passée, un seul ordre par véhicule et par date. */
 export function assertCanCreate(input: {
   vehicle: VehicleSnapshot | null;
   deliveryDate: string;
@@ -58,8 +50,6 @@ export function assertCanCreate(input: {
     );
   }
 
-  // Comparaison lexicale de chaînes YYYY-MM-DD : équivalente à une comparaison chronologique,
-  // sans passer par un objet Date (donc sans risque de décalage de fuseau horaire).
   if (input.deliveryDate < input.today) {
     throw new DomainError(
       ErrorCode.DELIVERY_DATE_IN_PAST,
@@ -77,7 +67,6 @@ export function assertCanCreate(input: {
   }
 }
 
-/** Règle 7 : ajout/retrait de commandes uniquement sur un ordre au statut Brouillon. */
 export function assertEditable(order: { status: TransportOrderStatus }): void {
   if (order.status !== TransportOrderStatus.DRAFT) {
     throw new DomainError(
@@ -88,12 +77,6 @@ export function assertEditable(order: { status: TransportOrderStatus }): void {
   }
 }
 
-/**
- * Règles 3 et 4 : seules les commandes À planifier peuvent être ajoutées, une commande ne peut
- * figurer que dans un seul ordre, ajout tout ou rien. `found` contient les commandes demandées
- * qui existent réellement en base (requêtées par le repository) ; celles qui manquent dans
- * `found` par rapport à `requestedNos` sont considérées introuvables.
- */
 export function assertPlannable(
   requestedNos: string[],
   found: SalesOrderSnapshot[],
@@ -154,7 +137,6 @@ function findDuplicates(values: string[]): string[] {
   return [...duplicates];
 }
 
-/** Règle 5 : le poids total ne doit jamais dépasser la capacité du véhicule (l'égalité est autorisée). */
 export function assertCapacity(
   capacityKg: number,
   currentKg: number,
@@ -171,7 +153,6 @@ export function assertCapacity(
   }
 }
 
-/** Règle 8 : seul un LOGISTICS_MANAGER valide, ordre non vide, ordre au statut Brouillon. */
 export function assertCanValidate(
   order: { status: TransportOrderStatus; lineCount: number },
   role: Role,
@@ -201,7 +182,6 @@ export function assertCanValidate(
   }
 }
 
-/** Règle 9 : un ordre Validé peut être marqué Parti. */
 export function assertCanDepart(order: { status: TransportOrderStatus }): void {
   if (order.status !== TransportOrderStatus.VALIDATED) {
     throw new DomainError(
@@ -212,7 +192,6 @@ export function assertCanDepart(order: { status: TransportOrderStatus }): void {
   }
 }
 
-/** Numéro suivant au format TO-0005. Pas de padding si le numéro dépasse 4 chiffres (TO-10000). */
 export function nextTransportOrderNo(lastNumber: number): string {
   return `TO-${String(lastNumber + 1).padStart(4, '0')}`;
 }

@@ -22,7 +22,6 @@ export class TransportOrdersRepository {
     return tx ? this.db.requestIn(tx) : this.db.request();
   }
 
-  /** Liste paginée des ordres, filtrable par statut et par date, avec poids total et nombre de lignes agrégés. */
   async findAll(
     query: TransportOrdersQueryDto,
   ): Promise<Page<TransportOrderListItemDto>> {
@@ -75,10 +74,6 @@ export class TransportOrdersRepository {
     return { items, total, page: query.page, pageSize: query.pageSize };
   }
 
-  /**
-   * Détail d'un ordre (véhicule, lignes, poids total, capacité restante), ou null si introuvable.
-   * `tx` optionnel : relit l'état à jour dans la même transaction juste après une mutation.
-   */
   async findDetail(
     no: string,
     tx?: sql.Transaction,
@@ -119,7 +114,6 @@ export class TransportOrdersRepository {
     return toTransportOrderDetailDto(header, linesResult.recordset);
   }
 
-  /** Date du jour selon le serveur SQL (source de vérité pour "date non passée", cf. DECISIONS.md). */
   async getServerToday(tx: sql.Transaction): Promise<string> {
     const result = await this.req(tx).query<{ today: string }>(`
       SELECT CONVERT(char(10), CAST(GETDATE() AS date), 23) AS today
@@ -127,11 +121,6 @@ export class TransportOrdersRepository {
     return result.recordset[0].today;
   }
 
-  /**
-   * Verrou applicatif exclusif, tenu pour la durée de la transaction : sérialise toutes les
-   * créations d'ordre entre elles, pour que la vérification "un seul ordre par véhicule et
-   * par date" (étape suivante) soit fiable même en cas de requêtes concurrentes.
-   */
   async acquireCreateLock(tx: sql.Transaction): Promise<void> {
     await this.req(tx)
       .input('resource', sql.NVarChar(50), 'transport-order:create')
@@ -140,7 +129,6 @@ export class TransportOrdersRepository {
       );
   }
 
-  /** Un ordre existe-t-il déjà pour ce véhicule à cette date ? */
   async existsForVehicleAndDate(
     vehicleCode: string,
     deliveryDate: string,
@@ -157,7 +145,6 @@ export class TransportOrdersRepository {
     return result.recordset.length > 0;
   }
 
-  /** Numéro du dernier ordre créé (0 si aucun), pour calculer le suivant avec nextTransportOrderNo(). */
   async getLastNumber(tx: sql.Transaction): Promise<number> {
     const result = await this.req(tx).query<{ lastNumber: number }>(`
       SELECT ISNULL(MAX(CAST(SUBSTRING([No_], 4, 16) AS int)), 0) AS lastNumber
@@ -184,10 +171,6 @@ export class TransportOrdersRepository {
       `);
   }
 
-  /**
-   * Verrouille la ligne de l'ordre pour la durée de la transaction (empêche deux mutations
-   * concurrentes sur le même ordre). Renvoie son statut et sa version, ou null si introuvable.
-   */
   async lockForUpdate(
     no: string,
     tx: sql.Transaction,
@@ -204,7 +187,6 @@ export class TransportOrdersRepository {
     return result.recordset[0] ?? null;
   }
 
-  /** Capacité du véhicule affecté à cet ordre. */
   async getVehicleCapacity(no: string, tx: sql.Transaction): Promise<number> {
     const result = await this.req(tx).input('no', sql.NVarChar(20), no).query<{
       capacityKg: number;
@@ -217,7 +199,6 @@ export class TransportOrdersRepository {
     return result.recordset[0].capacityKg;
   }
 
-  /** Somme des poids des commandes déjà affectées à cet ordre. */
   async sumCurrentWeight(no: string, tx: sql.Transaction): Promise<number> {
     const result = await this.req(tx).input('no', sql.NVarChar(20), no).query<{
       currentWeightKg: number;
@@ -230,7 +211,6 @@ export class TransportOrdersRepository {
     return result.recordset[0].currentWeightKg;
   }
 
-  /** Nombre de commandes actuellement affectées à cet ordre. */
   async countLines(no: string, tx: sql.Transaction): Promise<number> {
     const result = await this.req(tx).input('no', sql.NVarChar(20), no).query<{
       lineCount: number;
@@ -256,7 +236,6 @@ export class TransportOrdersRepository {
       `);
   }
 
-  /** Supprime une ligne. Renvoie true si une ligne a effectivement été supprimée. */
   async deleteLine(
     no: string,
     salesOrderNo: string,
@@ -289,7 +268,6 @@ export class TransportOrdersRepository {
       `);
   }
 
-  /** Passe au statut En livraison (2) toutes les commandes de cet ordre. */
   async markLinesInDelivery(no: string, tx: sql.Transaction): Promise<void> {
     await this.req(tx).input('no', sql.NVarChar(20), no).query(`
         UPDATE [Sales Order]
@@ -298,7 +276,6 @@ export class TransportOrdersRepository {
       `);
   }
 
-  /** Incrémente le rowversion de l'ordre sans changer sa valeur métier (bump de version optimiste). */
   async bumpVersion(no: string, tx: sql.Transaction): Promise<void> {
     await this.req(tx).input('no', sql.NVarChar(20), no).query(`
         UPDATE [Transport Order] SET [Status] = [Status] WHERE [No_] = @no

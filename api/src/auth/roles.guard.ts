@@ -11,10 +11,6 @@ import { Role } from './role.enum';
 import { ROLES_KEY } from './roles.decorator';
 import { RequestWithUser } from './request-with-user';
 
-/**
- * 403 si la route porte @Roles(...) et que l'utilisateur courant n'a pas l'un des rôles requis.
- * Doit s'exécuter après CurrentUserGuard (qui peuple request.user).
- */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}

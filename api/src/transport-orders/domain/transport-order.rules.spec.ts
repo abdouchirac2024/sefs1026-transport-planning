@@ -14,7 +14,6 @@ import {
   TransportOrderStatus,
 } from './transport-order.rules';
 
-/** Exécute `fn`, attend qu'elle lève une DomainError, et la retourne pour inspection. */
 function captureDomainError(fn: () => void): DomainError {
   try {
     fn();
@@ -62,7 +61,6 @@ describe('assertCapacity', () => {
   });
 
   it('ne produit pas d erreur d arrondi flottant classique (0,1 + 0,2 doit être traité comme 0,3 exactement)', () => {
-    // En JS, 0.1 + 0.2 === 0.30000000000000004 : une comparaison naïve rejetterait ce cas.
     expect(() => assertCapacity(0.3, 0.1, 0.2)).not.toThrow();
   });
 });

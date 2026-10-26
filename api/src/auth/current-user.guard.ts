@@ -9,10 +9,6 @@ import { ErrorCode } from '../common/errors/error-codes';
 import { RequestWithUser } from './request-with-user';
 import { USERS } from './users';
 
-/**
- * Lit X-User-Id sur chaque requête. 401 si l'en-tête est absent ou si
- * l'utilisateur n'est pas dans la liste codée en dur (auth simulée, pas de JWT).
- */
 @Injectable()
 export class CurrentUserGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {

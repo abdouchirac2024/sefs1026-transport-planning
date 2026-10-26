@@ -17,12 +17,6 @@ import {
 import { TransportOrderDetailDto } from './dto/transport-order-detail.dto';
 import { TransportOrdersRepository } from './transport-orders.repository';
 
-/**
- * Orchestre les mutations : ouvre une transaction, verrouille les lignes concernées,
- * appelle les règles pures du domaine, écrit, puis relit l'état à jour dans la même
- * transaction. Aucune règle métier n'est vérifiée ici directement : elle vit dans
- * domain/transport-order.rules.ts et est seulement invoquée.
- */
 @Injectable()
 export class TransportOrdersService {
   constructor(
@@ -37,8 +31,6 @@ export class TransportOrdersService {
     user: User,
   ): Promise<TransportOrderDetailDto> {
     return this.db.withTransaction(async (tx) => {
-      // Sérialise les créations entre elles : sans ce verrou, deux créations concurrentes
-      // pour le même véhicule/date pourraient toutes les deux passer la vérification suivante.
       await this.transportOrders.acquireCreateLock(tx);
 
       const vehicle = await this.vehicles.findByCode(input.vehicleCode, tx);
@@ -96,8 +88,6 @@ export class TransportOrdersService {
 
       await this.transportOrders.insertLines(no, salesOrderNos, tx);
 
-      // Garde-fou ultime : si une affectation concurrente a glissé entre findByNosForUpdate
-      // (qui verrouille) et ici, ce UPDATE ne touchera pas toutes les lignes attendues.
       const updatedCount = await this.salesOrders.markPlanned(
         salesOrderNos,
         tx,
@@ -193,7 +183,6 @@ export class TransportOrdersService {
     }
   }
 
-  /** Contrôle de concurrence optimiste, optionnel côté client (en-tête If-Match). */
   private assertVersionMatches(currentVersion: string, ifMatch?: string): void {
     if (ifMatch && ifMatch !== currentVersion) {
       throw new DomainError(

@@ -9,10 +9,6 @@ import { ConfigType } from '@nestjs/config';
 import * as sql from 'mssql';
 import databaseConfig from '../config/database.config';
 
-/**
- * Point d'accès unique à la base. Un seul ConnectionPool pour toute l'application
- * (mssql gère déjà le pooling des connexions en interne).
- */
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DatabaseService.name);
@@ -44,20 +40,14 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     await this.pool?.close();
   }
 
-  /** Nouvelle requête hors transaction. */
   request(): sql.Request {
     return this.pool.request();
   }
 
-  /** Nouvelle requête à l'intérieur d'une transaction déjà ouverte. */
   requestIn(tx: sql.Transaction): sql.Request {
     return new sql.Request(tx);
   }
 
-  /**
-   * Exécute `fn` dans une transaction : begin, puis commit si `fn` réussit,
-   * rollback si elle lève une erreur (y compris une DomainError).
-   */
   async withTransaction<T>(
     fn: (tx: sql.Transaction) => Promise<T>,
   ): Promise<T> {

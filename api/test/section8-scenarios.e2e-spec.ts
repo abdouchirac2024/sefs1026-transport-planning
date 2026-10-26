@@ -6,26 +6,8 @@ import { configureApp } from '../src/configure-app';
 import { DatabaseService, sql } from '../src/database/database.service';
 import { resetDatabase } from './helpers/reset-database';
 
-/**
- * Scénarios de vérification de la section 8 du skill (sefs1026-transport-planning).
- * Nécessite SQL Server démarré. Ignoré par défaut pour que `npm run test:e2e` reste vert
- * sans base disponible : lancer avec `npm run test:e2e:live` (reset + E2E_DB=true).
- *
- * Regroupés par thème (lectures, création, capacité, rôles, transitions, concurrence).
- * Chaque groupe relance `db:reset` (beforeAll ou beforeEach) pour repartir de données
- * connues : AUCUN test ne doit dépendre de l'effet d'un autre test, y compris d'un autre
- * test du même groupe -- chacun doit pouvoir être lancé seul (`it.only` / testNamePattern)
- * et donner le même résultat. Les groupes "Capacité" et "Transitions" utilisent beforeEach
- * (et non beforeAll) car plusieurs de leurs tests mutent les mêmes lignes partagées
- * (TO-0003, SO-1027, TO-0002...) ; un simple beforeAll y aurait laissé un ordre implicite
- * entre tests.
- */
 const describeWithDb = process.env.E2E_DB === 'true' ? describe : describe.skip;
 
-/**
- * Date au format YYYY-MM-DD, décalée de `offsetDays` par rapport à aujourd'hui en UTC --
- * aligné sur CAST(GETDATE() AS date) côté SQL Server (voir "Date du jour" dans DECISIONS.md).
- */
 function isoDate(offsetDays: number): string {
   const date = new Date();
   date.setUTCDate(date.getUTCDate() + offsetDays);
@@ -55,7 +37,6 @@ describeWithDb('Scénarios section 8 (e2e)', () => {
     await app.close();
   });
 
-  /** Lit directement le statut d'une commande en base : l'API ne l'expose pas individuellement. */
   async function salesOrderStatus(no: string): Promise<number> {
     const result = await db
       .request()
@@ -167,9 +148,6 @@ describeWithDb('Scénarios section 8 (e2e)', () => {
   });
 
   describe('Création d ordres', () => {
-    // Un seul test insère réellement (VH-05 aujourd'hui) ; les autres sont rejetés avant
-    // toute écriture. Un beforeAll suffit : aucun des quatre ne dépend qu'un autre ait (ou
-    // n'ait pas) tourné avant lui, seulement d'un état initial à 4 ordres (TO-0001..0004).
     beforeAll(() => resetDatabase());
 
     it('refuse la création sur VH-07 (inactif) -> 422 VEHICLE_INACTIVE', async () => {
@@ -211,9 +189,6 @@ describeWithDb('Scénarios section 8 (e2e)', () => {
   });
 
   describe('Capacité et affectation (TO-0003)', () => {
-    // beforeEach, pas beforeAll : "SO-1027 alone succeeds" affecte SO-1027, ce que le test
-    // "tout ou rien" suivant doit retrouver encore À planifier. Avec un seul beforeAll, l'ordre
-    // d'écriture des tests deviendrait implicitement significatif -- exactement ce qu'on évite ici.
     beforeEach(() => resetDatabase());
 
     it('refuse TO-0003 + SO-1013 (145,50 kg) : dépasse la capacité (1 360/1 500 kg) -> 422 CAPACITY_EXCEEDED', async () => {
@@ -270,9 +245,6 @@ describeWithDb('Scénarios section 8 (e2e)', () => {
   });
 
   describe('Transitions de statut', () => {
-    // beforeEach : plusieurs tests mutent TO-0003 ou TO-0002 (validation, retrait de ligne,
-    // départ) -- chacun doit retrouver l'état initial de init.sql, pas celui laissé par le
-    // test précédent du même groupe.
     beforeEach(() => resetDatabase());
 
     it('refuse la validation de TO-0004 (vide) par eric -> 422 EMPTY_ORDER', async () => {
@@ -379,7 +351,6 @@ describeWithDb('Scénarios section 8 (e2e)', () => {
   });
 
   describe('Contrôle de concurrence optimiste (If-Match)', () => {
-    // beforeAll suffit : chaque test crée son propre ordre, aucun partage d'état entre eux.
     beforeAll(() => resetDatabase());
 
     it('accepte la mutation quand If-Match correspond à la version actuelle', async () => {

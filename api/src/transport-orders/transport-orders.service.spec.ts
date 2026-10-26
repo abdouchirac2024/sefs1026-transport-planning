@@ -10,11 +10,6 @@ import { TransportOrderDetailDto } from './dto/transport-order-detail.dto';
 import { TransportOrdersRepository } from './transport-orders.repository';
 import { TransportOrdersService } from './transport-orders.service';
 
-/**
- * Tests de l'orchestration du service : repository et withTransaction entièrement mockés,
- * aucune connexion base de données. On vérifie l'ordre des appels, les codes d'erreur levés,
- * et que les écritures ne sont PAS appelées quand une règle métier rejette la mutation.
- */
 describe('TransportOrdersService', () => {
   let service: TransportOrdersService;
   let db: { withTransaction: jest.Mock };
@@ -47,8 +42,6 @@ describe('TransportOrdersService', () => {
     >
   >;
 
-  // withTransaction est mocké : `tx` n'est jamais inspecté, seulement transmis tel quel aux
-  // appels de repository (eux-mêmes mockés). Sa valeur réelle n'a donc pas d'importance ici.
   const fakeTx = {} as sql.Transaction;
 
   const diane: User = { id: 'diane', role: Role.DISPATCHER };
@@ -177,7 +170,6 @@ describe('TransportOrdersService', () => {
         fakeTx,
       );
 
-      // L'ordre des appels compte : on n'écrit qu'après avoir vérifié les règles.
       const insertOrder =
         transportOrders.insertLines.mock.invocationCallOrder[0];
       const markPlannedOrder =
@@ -236,7 +228,7 @@ describe('TransportOrdersService', () => {
     });
 
     it('détecte une affectation concurrente via le garde-fou rowsAffected (markPlanned < attendu)', async () => {
-      salesOrders.markPlanned.mockResolvedValue(0); // une autre transaction a pris la commande entre-temps
+      salesOrders.markPlanned.mockResolvedValue(0);
 
       await expect(
         service.addLines('TO-0003', ['SO-1027'], undefined),
@@ -244,9 +236,6 @@ describe('TransportOrdersService', () => {
         code: ErrorCode.SALES_ORDER_NOT_PLANNABLE,
         httpStatus: HttpStatus.CONFLICT,
       } satisfies Partial<DomainError>);
-      // insertLines a bien été appelé (on ne le sait qu'après), mais pas bumpVersion : la mutation
-      // n'est pas considérée aboutie. (Le rollback réel de la transaction est géré par DatabaseService,
-      // non re-testé ici puisque withTransaction est mocké.)
       expect(transportOrders.bumpVersion).not.toHaveBeenCalled();
     });
 
