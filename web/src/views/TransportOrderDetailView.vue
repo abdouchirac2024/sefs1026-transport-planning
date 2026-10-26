@@ -44,39 +44,39 @@ async function removeLine(salesOrderNo: string): Promise<void> {
   }
 }
 
-function confirmValidate(): void {
+function confirmMutation(
+  action: () => Promise<void>,
+  options: { message: string; acceptLabel: string; successSummary: string },
+): void {
   confirm.require({
-    message: `Valider l'ordre ${props.no} ? Il ne sera plus modifiable ensuite.`,
+    message: options.message,
     header: 'Confirmation',
     icon: 'pi pi-exclamation-triangle',
-    acceptLabel: 'Valider',
+    acceptLabel: options.acceptLabel,
     rejectLabel: 'Annuler',
     accept: async () => {
       try {
-        await store.validateCurrent();
-        toast.add({ severity: 'success', summary: 'Ordre validé', detail: props.no, life: 3000 });
+        await action();
+        toast.add({ severity: 'success', summary: options.successSummary, detail: props.no, life: 3000 });
       } catch {
-        // Erreur déjà affichée via store.mutationError.
       }
     },
   });
 }
 
+function confirmValidate(): void {
+  confirmMutation(() => store.validateCurrent(), {
+    message: `Valider l'ordre ${props.no} ? Il ne sera plus modifiable ensuite.`,
+    acceptLabel: 'Valider',
+    successSummary: 'Ordre validé',
+  });
+}
+
 function confirmDepart(): void {
-  confirm.require({
+  confirmMutation(() => store.departCurrent(), {
     message: `Marquer l'ordre ${props.no} comme parti ? Cette action est irréversible.`,
-    header: 'Confirmation',
-    icon: 'pi pi-exclamation-triangle',
     acceptLabel: 'Marquer parti',
-    rejectLabel: 'Annuler',
-    accept: async () => {
-      try {
-        await store.departCurrent();
-        toast.add({ severity: 'success', summary: 'Ordre parti', detail: props.no, life: 3000 });
-      } catch {
-        // Erreur déjà affichée via store.mutationError.
-      }
-    },
+    successSummary: 'Ordre parti',
   });
 }
 
