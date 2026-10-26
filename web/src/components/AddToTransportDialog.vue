@@ -215,8 +215,8 @@ function close(): void {
         <div class="capacity-preview__fill" :style="{ width: capacityPreviewPercent + '%' }" />
       </div>
       <p v-if="wouldExceedCapacity" class="capacity-preview__hint">
-        Dépasse la capacité restante de <strong>{{ overflowKg.toFixed(2) }} kg</strong> — l'API refusera l'ajout tant
-        que la sélection n'est pas réduite ou qu'un véhicule plus grand n'est pas choisi.
+        Dépasse la capacité restante de <strong>{{ overflowKg.toFixed(2) }} kg</strong> — réduisez la sélection ou
+        choisissez un véhicule avec plus de capacité disponible.
       </p>
     </div>
 
