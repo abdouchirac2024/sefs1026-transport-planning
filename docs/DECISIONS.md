@@ -119,3 +119,31 @@ complet et les commits `fix(api):` correspondants.
 **Décision** : `fetch` natif avec un petit wrapper, plutôt qu'axios. Le périmètre de l'API est
 réduit (une dizaine de routes), un wrapper de 30-40 lignes suffit à injecter `X-User-Id` et à
 mapper les erreurs en `ApiError`, sans dépendance supplémentaire.
+
+## `lineCount` absent du détail d'un ordre de transport (bug trouvé après coup)
+
+**Constat** : `GET /transport-orders/:no` ne renvoyait jamais `lineCount`, alors que
+`GET /transport-orders` (liste) et la validation interne (`countLines`, usage serveur) l'avaient
+tous les deux. La requête SQL d'en-tête de `findDetail` sélectionnait `no`, `vehicleCode`,
+`capacityKg`, `status`... mais pas de `COUNT`. Aucune erreur TypeScript ne l'a signalé : le type
+front `TransportOrderDetail` (`domain/types.ts`) et le DTO API `TransportOrderDetailDto` sont
+deux interfaces indépendantes, définies dans deux projets séparés -- rien ne garantit qu'elles
+restent alignées à la compilation, seul le contrat JSON au runtime les relie.
+
+**Conséquence concrète** : côté front, `canValidate()` (`domain/permissions.ts`) évalue
+`order.lineCount >= 1`, qui vaut `false` quand `lineCount` est `undefined` -- le bouton
+"Valider" ne s'affichait donc **jamais** sur l'écran de détail, pour aucun ordre, quel que soit
+le rôle connecté. La règle métier n°8 du sujet (seul un `LOGISTICS_MANAGER` peut valider un
+ordre) était de fait inatteignable depuis l'interface, alors que l'API elle-même l'appliquait
+correctement (route `POST /transport-orders/:no/validate` testée et fonctionnelle).
+
+**Pourquoi ça n'a pas été détecté par les tests automatisés** : les tests e2e section 8
+appellent directement `POST .../validate`, sans jamais passer par `GET .../:no` puis vérifier
+la présence de `lineCount` dans la réponse -- le trou était spécifiquement dans la réponse du
+détail, jamais exercé sous cet angle. Trouvé en répondant à une question sur le comportement
+du bouton "Valider" pour un ordre réel (TO-0005), confirmé par un appel direct à l'API.
+
+**Décision** : calculer `lineCount: lines.length` dans `toTransportOrderDetailDto` plutôt que
+d'ajouter un `COUNT` SQL séparé -- les lignes sont de toute façon déjà chargées pour calculer
+`totalWeightKg`, donc aucune requête supplémentaire n'est nécessaire. 2 tests unitaires ajoutés
+sur le mapper pour combler ce trou de couverture.

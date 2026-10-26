@@ -85,7 +85,8 @@ aucun test ne dépend de l'effet d'un autre — chacun peut être lancé seul.
 
 **Vérifié contre une vraie instance SQL Server** (voir "Vérification contre la vraie base") :
 26/26 tests e2e passent (21 scénarios de la section 8 + 2 tests If-Match + 3 tests auth/vehicles
-de base), 79/79 tests unitaires API, 11/11 tests unitaires front.
+de base), 81/81 tests unitaires API, 30/30 tests unitaires front (dont les stores Pinia
+`sales-orders`/`transport-orders` : cache par page, invalidation après mutation).
 
 ### Utilisateurs de test
 
@@ -128,7 +129,7 @@ section 8 passent**, Swagger se charge correctement, le front fonctionne.
 | 20 | Départ TO-0001 (déjà parti) | 409 `INVALID_STATUS_TRANSITION` | ✅ |
 | 21 | Deux ajouts concurrents de SO-1008 | un seul réussit (200/409) | ✅ |
 
-### Bugs trouvés et corrigés (3, chacun avec un commit `fix(api): ...` séparé)
+### Bugs trouvés et corrigés (4, chacun avec un commit `fix(api): ...` séparé)
 
 1. **Les tests e2e ne configuraient pas `ValidationPipe`/`DomainErrorFilter`** comme `main.ts`
    le fait. `Test.createTestingModule().createNestApplication()` ne rejoue pas le `bootstrap()`
@@ -153,12 +154,25 @@ section 8 passent**, Swagger se charge correctement, le front fonctionne.
    Corrigé avec `master.dbo.fn_varbintohexstr([timestamp])`, la fonction système correcte, et
    2 tests e2e ajoutés pour combler ce trou de couverture. *Affectait bien le serveur réel dès
    qu'un client respectait `If-Match`.*
+4. **`GET /transport-orders/:no` ne renvoyait pas `lineCount`** : la requête SQL d'en-tête du
+   détail sélectionnait `no`, `vehicleCode`, `status`... mais jamais `lineCount` (seules la liste
+   paginée et la validation interne l'avaient). Aucune erreur TypeScript ne l'a signalé : le type
+   front `TransportOrderDetail` est une interface indépendante du DTO API, non partagée entre les
+   deux projets. Conséquence concrète : `canValidate()` côté front fait `lineCount >= 1`, qui vaut
+   toujours `false` quand `lineCount` est `undefined` — **le bouton "Valider" ne s'affichait donc
+   jamais sur l'écran de détail, pour aucun ordre, quel que soit le rôle**, rendant la règle
+   métier n°8 (seul un `LOGISTICS_MANAGER` peut valider) inatteignable depuis l'UI. **Trouvé en
+   répondant à une question sur `/transport-orders/TO-0005`**, pas par un test automatisé.
+   Corrigé en calculant `lineCount = lines.length` dans `toTransportOrderDetailDto` (les lignes
+   sont déjà chargées pour `totalWeightKg`, aucune requête SQL supplémentaire), avec 2 tests
+   unitaires ajoutés. *Affectait bien le serveur réel.*
 
 Aucun des risques identifiés à l'avance (combinaison `GROUP BY` + `COUNT(*) OVER()` +
 `OFFSET/FETCH`, syntaxe `sp_getapplock`, `OPENJSON`, noms de colonnes entre crochets) ne s'est
 révélé être un problème : le SQL écrit en suivant la documentation était correct du premier
-coup. Les 3 bugs réels trouvés portaient tous sur des détails plus subtils (configuration du
-bootstrap de test, code HTTP par défaut de NestJS, sens de conversion `CONVERT`).
+coup. Les 4 bugs réels trouvés portaient tous sur des détails plus subtils (configuration du
+bootstrap de test, code HTTP par défaut de NestJS, sens de conversion `CONVERT`, un champ
+manquant dans une requête SQL de détail).
 
 ## Choix techniques et pourquoi
 
@@ -250,7 +264,9 @@ temps :
 - Audit / historique des changements de statut.
 - Tests e2e en CI avec conteneur SQL Server éphémère (le test e2e existe déjà, gaté par
   `E2E_DB=true`, mais n'est pas branché dans une pipeline).
-- Tests de composants Vue (Vitest + @vue/test-utils) au-delà de `domain/permissions.ts`.
+- Tests de composants Vue (Vitest + @vue/test-utils) : les règles pures (`domain/permissions.ts`)
+  et les stores Pinia (`sales-orders`, `transport-orders`, cache par page inclus) sont testés,
+  mais aucun composant `.vue` (DataTable, dialogues) ne l'est — vérifiés manuellement seulement.
 - Bonus non traités : i18n FR/EN. Swagger est fait et vérifié (`@nestjs/swagger`, `/api/docs`,
   `@ApiHeader` pour `X-User-Id`, exemples de réponses d'erreur par route).
 
